@@ -37,6 +37,11 @@ class JsonFileBackend(StorageBackend):
     def get_solutions(self) -> dict:
         if not self._solutions_path.exists():
             self._seed_solutions()
+        else:
+            # Re-seed if existing file has empty solutions list (stale volume)
+            data = json.loads(self._solutions_path.read_text())
+            if not data.get("solutions"):
+                self._seed_solutions()
         return json.loads(self._solutions_path.read_text())
 
     def save_solutions(self, data: dict) -> None:

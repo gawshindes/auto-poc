@@ -41,17 +41,5 @@
       "status": "built",
       "demo_url": "https://demo-renocomputerfix-production-98c1.up.railway.app"
     }
-  ],
-  "matching_rules": {
-    "full_match": "3+ keywords match AND demo_type matches → reuse and customize",
-    "partial_match": "1-2 keywords match OR components are reusable → use as starting point",
-    "no_match": "Build new → add to registry when done",
-    "status_filter": "Only use solutions with status: built or in_progress (not planned)"
-  },
-  "pipeline_stages": {
-    "discovery": "First meeting to understand the problem — demo pipeline applies",
-    "demo": "Showing the solution — demo already exists or being built",
-    "contract": "Negotiating terms — demo pipeline does NOT apply",
-    "other": "Check context — may not need demo pipeline at all"
-  }
+  ]
 }
