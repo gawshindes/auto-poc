@@ -18,9 +18,19 @@ Accept more than one file per session — e.g. transcript + a spec doc + a produ
 - Concatenate or section-label each document before passing to the classifier
 - Show uploaded file list with remove option before starting
 
-### 3. Team onboarding tool (CLI + web)
-Currently `registry/team.json` is edited manually. A small onboarding flow that asks for team member names and writes the file — useful for new deployers.
+### 3. Onboarding tool (CLI + web)
+Currently `registry/team.json` and `registry/solutions.json` are edited manually. A guided onboarding flow for new deployers.
+
+**Team onboarding:**
+- CLI: `python onboard.py` — prompts for team member names interactively, writes `registry/team.json`
+- Web: `/settings` page with a form to add/remove team members
+
+**Solutions onboarding:**
+- Allow adding pre-existing solutions (built outside the pipeline) via a form
+- Fields: name, description, demo type, keywords, stack, source (manual/demo_tool), demo URL
+- Useful for bootstrapping the registry with solutions the team has already built before adopting this tool
 
 **Implementation ideas:**
-- CLI: `python onboard.py` — prompts for names interactively, writes `registry/team.json`
-- Web: `/settings` page with a form to add/remove team members, saved to the volume
+- Single `/settings` page in the web UI covering both team + solutions management
+- CLI: `python onboard.py --team` and `python onboard.py --solutions` for headless setup
+- Validate entries against the expected schema before saving

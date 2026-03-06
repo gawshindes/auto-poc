@@ -34,19 +34,16 @@ try:
 except ImportError:
     pass
 
-# DATA_DIR: persistent storage root (set DATA_DIR=/data on Railway)
-DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).parent)))
-
 from pipeline import (
     run_classifier, run_dependency_checker, run_solutions_matcher,
     run_sdr_messenger, run_demo_builder, run_demo_guide,
     append_to_registry, read_transcript,
 )
+from storage import get_backend
 
 app = FastAPI()
 
-SESSIONS_DIR = DATA_DIR / "sessions"
-SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+_backend = get_backend()
 
 HTML_FILE = Path(__file__).parent / "index.html"
 
@@ -61,20 +58,15 @@ _loop: asyncio.AbstractEventLoop | None = None
 # Session helpers
 # ---------------------------------------------------------------------------
 
-def _session_path(session_id: str) -> Path:
-    return SESSIONS_DIR / f"{session_id}.json"
-
-
 def _load_session(session_id: str) -> dict:
-    p = _session_path(session_id)
-    if not p.exists():
+    session = _backend.get_session(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return json.loads(p.read_text())
+    return session
 
 
 def _save_session(session: dict) -> None:
-    session["updated_at"] = datetime.now().isoformat()
-    _session_path(session["session_id"]).write_text(json.dumps(session, indent=2))
+    _backend.save_session(session)
 
 
 def _new_session(transcript: str, mode: str = "auto", email: str = "") -> dict:
@@ -431,24 +423,7 @@ async def submit_input(session_id: str, body: dict):
 
 @app.get("/sessions")
 async def list_sessions():
-    sessions = []
-    if SESSIONS_DIR.exists():
-        for f in SESSIONS_DIR.glob("*.json"):
-            try:
-                s = json.loads(f.read_text())
-                classifier = s.get("stage_1_classifier") or {}
-                sessions.append({
-                    "session_id": s["session_id"],
-                    "company": classifier.get("company_name") or classifier.get("customer", {}).get("company", "Unknown"),
-                    "status": s.get("status", "unknown"),
-                    "current_stage": s.get("current_stage", 0),
-                    "created_at": s.get("created_at", ""),
-                    "updated_at": s.get("updated_at", ""),
-                })
-            except Exception:
-                pass
-    sessions.sort(key=lambda x: x["updated_at"], reverse=True)
-    return JSONResponse(sessions)
+    return JSONResponse(_backend.list_sessions())
 
 
 @app.post("/redeploy/{session_id}")

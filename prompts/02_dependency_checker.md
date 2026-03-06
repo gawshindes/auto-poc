@@ -15,7 +15,7 @@ they cannot recover from a demo that isn't ready on time.
 
 ### ✅ WE PROVIDE
 Things the agency can inject automatically. Never ask for these.
-See `capabilities.json` for the full registry. Examples:
+See the capabilities registry (injected below the demo spec). Examples:
 - LLM API keys (Claude, OpenAI, Gemini)
 - Hosting environments (Modal for pipelines, Railway for UIs)
 - Standard APIs (Serper for search, SendGrid for email, Twilio for SMS)

@@ -8,18 +8,11 @@ so they can be imported and called directly without any setup boilerplate.
 import json
 import re
 import os
-from datetime import datetime
 from pathlib import Path
 
 import anthropic
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-
-# DATA_DIR: persistent storage root.
-# - Locally: defaults to PROJECT_ROOT (solutions.json lives at registry/solutions.json)
-# - Railway: set DATA_DIR=/data (Railway Volume mount point)
-DATA_DIR = Path(os.environ.get("DATA_DIR", str(PROJECT_ROOT)))
-SOLUTIONS_PATH = DATA_DIR / "registry" / "solutions.json"
 
 
 # ---------------------------------------------------------------------------
@@ -45,40 +38,17 @@ def _load_registry(filename: str, default: dict | None = None) -> dict:
     return json.loads(path.read_text())
 
 
-def _load_solutions() -> dict:
-    """Load solutions from DATA_DIR/solutions.json, creating it if missing."""
-    if not SOLUTIONS_PATH.exists():
-        SOLUTIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        empty = {
-            "version": "1.0",
-            "last_updated": datetime.now().strftime("%Y-%m-%d"),
-            "note": "Solutions registry — populated automatically as demos are built.",
-            "solutions": [],
-            "matching_rules": {
-                "full_match": "3+ keywords match AND demo_type matches → reuse and customize",
-                "partial_match": "1-2 keywords match OR components are reusable → use as starting point",
-                "no_match": "Build new → add to registry when done",
-                "status_filter": "Only use solutions with status: built or in_progress (not planned)",
-            },
-        }
-        SOLUTIONS_PATH.write_text(json.dumps(empty, indent=2))
-    return json.loads(SOLUTIONS_PATH.read_text())
-
-
 PROMPTS = {
-    "classifier": _load_prompt("01_classifier.md"),
-    "dependency":  _load_prompt("02_dependency_checker.md"),
-    "matcher":     _load_prompt("03_solutions_matcher.md"),
-    "messenger":   _load_prompt("04_sdr_messenger.md"),
-    "builder":     _load_prompt("05_demo_builder.md"),
-    "guide":       _load_prompt("06_demo_guide.md"),
+    "classifier":   _load_prompt("01_classifier.md"),
+    "dependency":   _load_prompt("02_dependency_checker.md"),
+    "capabilities": _load_prompt("capabilities.md"),
+    "matcher":      _load_prompt("03_solutions_matcher.md"),
+    "messenger":    _load_prompt("04_sdr_messenger.md"),
+    "builder":      _load_prompt("05_demo_builder.md"),
+    "guide":        _load_prompt("06_demo_guide.md"),
 }
 
-REGISTRIES = {
-    "capabilities": _load_registry("capabilities.json"),
-    "solutions":    _load_solutions(),
-    "team":         _load_registry("team.json", default={"team": []}),
-}
+TEAM = _load_registry("team.json", default={"team": []})
 
 _client: anthropic.Anthropic | None = None
 
@@ -91,6 +61,15 @@ def get_client() -> anthropic.Anthropic:
             raise RuntimeError("ANTHROPIC_API_KEY not set")
         _client = anthropic.Anthropic(api_key=key)
     return _client
+
+
+# ---------------------------------------------------------------------------
+# Storage backend (lazy import to avoid circular deps)
+# ---------------------------------------------------------------------------
+
+def _get_backend():
+    from storage import get_backend
+    return get_backend()
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +108,7 @@ def _parse_json(raw: str, stage_name: str) -> dict:
 def run_classifier(transcript: str) -> dict:
     content = (
         f"Internal team members (anyone else is the customer):\n"
-        f"{json.dumps(REGISTRIES['team']['team'], indent=2)}\n\n"
+        f"{json.dumps(TEAM['team'], indent=2)}\n\n"
         f"Analyze this transcript:\n\n{transcript}"
     )
     return _parse_json(run_stage(PROMPTS["classifier"], content), "Classifier")
@@ -138,16 +117,17 @@ def run_classifier(transcript: str) -> dict:
 def run_dependency_checker(classifier_output: dict) -> dict:
     content = (
         f"Demo spec:\n{json.dumps(classifier_output, indent=2)}\n\n"
-        f"Capabilities registry:\n{json.dumps(REGISTRIES['capabilities'], indent=2)}"
+        f"Capabilities registry:\n{PROMPTS['capabilities']}"
     )
     return _parse_json(run_stage(PROMPTS["dependency"], content), "Dependency Checker")
 
 
 def run_solutions_matcher(classifier_output: dict, dependency_output: dict) -> dict:
+    solutions = _get_backend().get_solutions()
     content = (
         f"Classifier output:\n{json.dumps(classifier_output, indent=2)}\n\n"
         f"Dependency output:\n{json.dumps(dependency_output, indent=2)}\n\n"
-        f"Solutions registry:\n{json.dumps(REGISTRIES['solutions'], indent=2)}"
+        f"Solutions registry:\n{json.dumps(solutions, indent=2)}"
     )
     return _parse_json(run_stage(PROMPTS["matcher"], content), "Solutions Matcher")
 
@@ -191,15 +171,10 @@ def run_demo_guide(classifier_output: dict, demo_output: str, live_url: str = ""
 # Registry helpers
 # ---------------------------------------------------------------------------
 
-def reload_solutions() -> dict:
-    """Re-read solutions.json from disk (used after appending a new entry)."""
-    return _load_solutions()
-
-
 def append_to_registry(matcher_output: dict, classifier_output: dict,
                        deploy_url: str | None = None) -> str | None:
     """
-    Append a newly built solution to registry/solutions.json.
+    Append a newly built solution to the solutions registry.
     Returns the new solution ID, or None if skipped.
     """
     if not matcher_output.get("add_to_registry_after_build", False):
@@ -209,7 +184,8 @@ def append_to_registry(matcher_output: dict, classifier_output: dict,
     if not suggested or not suggested.get("name"):
         return None
 
-    data = json.loads(SOLUTIONS_PATH.read_text())
+    backend = _get_backend()
+    data = backend.get_solutions()
     solutions = data.get("solutions", [])
 
     name = suggested.get("name", "")
@@ -238,13 +214,7 @@ def append_to_registry(matcher_output: dict, classifier_output: dict,
         "demo_url": deploy_url or None,
     }
 
-    solutions.append(entry)
-    data["solutions"] = solutions
-    data["last_updated"] = datetime.now().strftime("%Y-%m-%d")
-    SOLUTIONS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False))
-
-    # Keep in-memory registry in sync
-    REGISTRIES["solutions"] = data
+    backend.append_solution(entry, data)
     return new_id
 
 

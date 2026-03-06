@@ -16,24 +16,19 @@ from pipeline import (
     run_sdr_messenger, run_demo_builder, run_demo_guide,
     append_to_registry,
 )
+from storage import get_backend
 
 app = App(token=os.environ["SLACK_BOT_TOKEN"])
 
-STATE_DIR = Path(__file__).parent / "state"
+_backend = get_backend()
 
 
 def _save_state(channel_id: str, state: dict) -> None:
-    STATE_DIR.mkdir(exist_ok=True)
-    with open(STATE_DIR / f"{channel_id}.json", "w") as f:
-        json.dump(state, f, indent=2)
+    _backend.save_slack_state(channel_id, state)
 
 
 def _load_state(channel_id: str) -> dict | None:
-    path = STATE_DIR / f"{channel_id}.json"
-    if not path.exists():
-        return None
-    with open(path) as f:
-        return json.load(f)
+    return _backend.get_slack_state(channel_id)
 
 
 def format_slack_blocks(classifier, dependency, matcher, messenger_output):

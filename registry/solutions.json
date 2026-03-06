@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-06",
+  "note": "Add every completed demo here after it's built. This registry is checked BEFORE building anything new. A match means we customize an existing solution rather than building from scratch — saving hours. Partial matches mean we can use components. source field: 'manual' = built outside the deploy tool (no URL expected), 'demo_tool' = auto-deployed by deploy.py (Railway URL available).",
+  "solutions": [
+    {
+      "id": "sol_001",
+      "name": "Voice Agent — Inbound + Outbound",
+      "source": "manual",
+      "demo_url": null,
+      "status": "built",
+      "note": "Demoed created on 11labs — no URL needed"
+    },
+    {
+      "id": "sol_002",
+      "name": "SEO + AO Content Generation Tool",
+      "source": "manual",
+      "demo_url": null,
+      "status": "built",
+      "note": "Marketing team's tool — contact Marketing for demo"
+    },
+    {
+      "id": "sol_008",
+      "name": "E-commerce Inventory Sync Pipeline",
+      "description": "Scrapes third-party eBay store listings, applies markup, and displays on client's website as extended inventory. Automated daily sync with product filtering and price calculations.",
+      "built_for": "RenoComputerFix",
+      "demo_type": "pipeline",
+      "keywords": [
+        "ebay",
+        "scraping",
+        "inventory",
+        "sync",
+        "ecommerce",
+        "markup",
+        "pipeline",
+        "retail",
+        "dropshipping"
+      ],
+      "stack": "Python + Playwright + Modal + Railway + Supabase",
+      "source": "demo_tool",
+      "status": "built",
+      "demo_url": "https://demo-renocomputerfix-production-98c1.up.railway.app"
+    }
+  ],
+  "matching_rules": {
+    "full_match": "3+ keywords match AND demo_type matches → reuse and customize",
+    "partial_match": "1-2 keywords match OR components are reusable → use as starting point",
+    "no_match": "Build new → add to registry when done",
+    "status_filter": "Only use solutions with status: built or in_progress (not planned)"
+  },
+  "pipeline_stages": {
+    "discovery": "First meeting to understand the problem — demo pipeline applies",
+    "demo": "Showing the solution — demo already exists or being built",
+    "contract": "Negotiating terms — demo pipeline does NOT apply",
+    "other": "Check context — may not need demo pipeline at all"
+  }
+}

@@ -37,7 +37,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from pipeline import (
     run_classifier, run_dependency_checker, run_solutions_matcher,
     run_sdr_messenger, run_demo_builder, run_demo_guide,
-    append_to_registry, read_transcript, PROMPTS, REGISTRIES,
+    append_to_registry, read_transcript, PROMPTS,
 )
 
 
