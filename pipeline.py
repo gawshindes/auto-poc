@@ -33,10 +33,15 @@ def _load_prompt(filename: str) -> str:
     return path.read_text()
 
 
-def _load_registry(filename: str) -> dict:
+def _load_registry(filename: str, default: dict | None = None) -> dict:
     path = PROJECT_ROOT / "registry" / filename
     if not path.exists():
-        raise FileNotFoundError(f"Registry file not found: {path}")
+        if default is not None:
+            return default
+        raise FileNotFoundError(
+            f"Registry file not found: {path}\n"
+            f"Copy registry/{filename.replace('.json', '.example.json')} to registry/{filename} and fill in your data."
+        )
     return json.loads(path.read_text())
 
 
@@ -72,7 +77,7 @@ PROMPTS = {
 REGISTRIES = {
     "capabilities": _load_registry("capabilities.json"),
     "solutions":    _load_solutions(),
-    "team":         _load_registry("team.json"),
+    "team":         _load_registry("team.json", default={"team": []}),
 }
 
 _client: anthropic.Anthropic | None = None

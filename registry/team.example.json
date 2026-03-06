@@ -1,0 +1,13 @@
+{
+  "note": "List everyone on your internal team. The classifier uses this to distinguish your team members from the customer in a sales call transcript. Copy this file to team.json and fill in your team.",
+  "team": [
+    {
+      "name": "Alice Smith",
+      "role": "Account Executive"
+    },
+    {
+      "name": "Bob Jones",
+      "role": "Solutions Engineer"
+    }
+  ]
+}
