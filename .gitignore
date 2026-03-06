@@ -14,6 +14,7 @@ __pycache__/
 .claude/
 
 # Runtime state & outputs
+sessions/
 web/sessions/
 test/data/outputs/
 slack/state/
