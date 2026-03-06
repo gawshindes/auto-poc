@@ -450,3 +450,13 @@ async def get_session(session_id: str):
     # Don't send full transcript/demo in status check — too large
     summary = {k: v for k, v in session.items() if k not in ("transcript", "stage_5_demo")}
     return JSONResponse(summary)
+
+
+@app.get("/debug/solutions")
+async def debug_solutions():
+    solutions = _backend.get_solutions()
+    entries = solutions.get("solutions", [])
+    return JSONResponse({
+        "count": len(entries),
+        "solutions": [{"id": s.get("id"), "name": s.get("name")} for s in entries],
+    })
