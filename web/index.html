@@ -252,11 +252,73 @@
     font-size: 0.82rem;
     color: #e05050;
   }
+
+  /* Header nav */
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .header h1 { margin-bottom:0; }
+  .nav-link { font-size:0.82rem; color:#666; cursor:pointer; text-decoration:none; transition:color 0.15s; }
+  .nav-link:hover { color:#5b6af0; }
+
+  /* Settings */
+  .settings-section { margin-bottom:2.5rem; }
+  .settings-section h2 { font-size:1rem; font-weight:600; color:#fff; margin-bottom:0.75rem; }
+  .settings-section p.desc { font-size:0.8rem; color:#666; margin-bottom:1rem; }
+
+  .team-list { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:1rem; }
+  .team-chip {
+    display:inline-flex; align-items:center; gap:6px;
+    background:#1a1a22; border:1px solid #2a2a35; border-radius:20px;
+    padding:5px 12px; font-size:0.8rem; color:#ccc;
+  }
+  .team-chip .remove { cursor:pointer; color:#555; font-size:0.7rem; }
+  .team-chip .remove:hover { color:#e05050; }
+
+  .add-row { display:flex; gap:8px; margin-bottom:0.5rem; }
+  .add-row input {
+    flex:1; background:#1a1a22; border:1px solid #2a2a35; border-radius:8px;
+    padding:8px 12px; color:#e0e0e0; font-size:0.85rem; outline:none;
+  }
+  .add-row input:focus { border-color:#5b6af0; }
+  .btn-sm { padding:8px 16px; font-size:0.8rem; }
+
+  .sol-table { width:100%; border-collapse:collapse; }
+  .sol-table th { text-align:left; font-size:0.72rem; color:#555; text-transform:uppercase; letter-spacing:0.5px; padding:6px 8px; border-bottom:1px solid #222; }
+  .sol-table td { font-size:0.82rem; color:#ccc; padding:8px; border-bottom:1px solid #1a1a1a; }
+  .sol-table tr:hover td { background:#111; }
+  .sol-table .sol-name { font-weight:500; color:#fff; }
+  .sol-table .sol-id { font-size:0.72rem; color:#555; }
+  .sol-delete { cursor:pointer; color:#555; font-size:0.78rem; }
+  .sol-delete:hover { color:#e05050; }
+
+  .sol-form { background:#1a1a22; border:1px solid #2a2a35; border-radius:10px; padding:16px; margin-top:1rem; }
+  .sol-form .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .sol-form .form-full { grid-column:1/-1; }
+  .sol-form label { display:block; font-size:0.72rem; color:#888; margin-bottom:3px; }
+  .sol-form input, .sol-form select {
+    width:100%; background:#111; border:1px solid #2a2a35; border-radius:6px;
+    padding:7px 10px; color:#e0e0e0; font-size:0.82rem; outline:none;
+  }
+  .sol-form input:focus, .sol-form select:focus { border-color:#5b6af0; }
+
+  .upload-json-row { display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid #1e1e1e; }
+  .upload-json-label { font-size:0.75rem; color:#555; }
+  .upload-json-btn { cursor:pointer; display:inline-block; }
+
+  .toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:#1a3020; border:1px solid #2a4a30; color:#5fcf80;
+    padding:10px 20px; border-radius:8px; font-size:0.82rem; font-weight:500;
+    opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:100;
+  }
+  .toast.visible { opacity:1; }
 </style>
 </head>
 <body>
 <div class="app">
-  <h1><a href="/" style="color:inherit;text-decoration:none;">Demo Creation Pipeline</a></h1>
+  <div class="header">
+    <h1><a href="/" style="color:inherit;text-decoration:none;">Demo Creation Pipeline</a></h1>
+    <a class="nav-link" id="nav-settings" onclick="showSettings()">Settings</a>
+  </div>
   <p class="subtitle">Upload a discovery call transcript to analyze and build a demo</p>
 
   <!-- View 1: Upload -->
@@ -323,7 +385,85 @@
       </div>
     </div>
   </div>
+
+  <!-- View 4: Settings -->
+  <div class="view" id="view-settings">
+    <div class="settings-section">
+      <h2>Team Members</h2>
+      <p class="desc">Anyone not in this list is treated as a customer in transcripts.</p>
+      <div class="team-list" id="team-list"></div>
+      <div class="add-row">
+        <input type="text" id="team-name-input" placeholder="Full name" onkeydown="if(event.key==='Enter')addTeamMember()">
+        <button class="btn btn-sm" onclick="addTeamMember()">Add</button>
+      </div>
+      <div style="font-size:0.72rem;color:#444;margin-top:4px;" id="team-count"></div>
+      <div class="upload-json-row">
+        <span class="upload-json-label">Or import from JSON:</span>
+        <label class="btn-ghost btn-sm upload-json-btn">
+          Upload team.json
+          <input type="file" accept=".json" style="display:none" onchange="uploadTeamJson(this)">
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Solutions Registry</h2>
+      <p class="desc">Existing demos the pipeline checks before building from scratch.</p>
+      <div id="solutions-table-wrap"></div>
+
+      <div class="sol-form" id="sol-form">
+        <div style="font-size:0.88rem;font-weight:600;color:#fff;margin-bottom:12px;">Add Solution</div>
+        <div class="form-grid">
+          <div class="form-full">
+            <label>Name *</label>
+            <input type="text" id="sol-name" placeholder="e.g. Voice Agent — Inbound + Outbound">
+          </div>
+          <div class="form-full">
+            <label>Description</label>
+            <input type="text" id="sol-description" placeholder="Brief description of what it does">
+          </div>
+          <div>
+            <label>Demo Type</label>
+            <input type="text" id="sol-demo-type" placeholder="e.g. chat_agent, dashboard, pipeline">
+          </div>
+          <div>
+            <label>Stack</label>
+            <input type="text" id="sol-stack" placeholder="e.g. Python + Flask + Railway">
+          </div>
+          <div>
+            <label>Keywords (comma-separated)</label>
+            <input type="text" id="sol-keywords" placeholder="e.g. voice, agent, screening">
+          </div>
+          <div>
+            <label>Source</label>
+            <select id="sol-source">
+              <option value="manual">Manual (built outside tool)</option>
+              <option value="demo_tool">Demo Tool (auto-deployed)</option>
+            </select>
+          </div>
+          <div class="form-full">
+            <label>Demo URL (optional)</label>
+            <input type="text" id="sol-demo-url" placeholder="https://...">
+          </div>
+          <div class="form-full">
+            <label>Note (optional)</label>
+            <input type="text" id="sol-note" placeholder="Any context for the team">
+          </div>
+        </div>
+        <button class="btn btn-sm" onclick="addSolution()">Add Solution</button>
+      </div>
+      <div class="upload-json-row">
+        <span class="upload-json-label">Or import from JSON:</span>
+        <label class="btn-ghost btn-sm upload-json-btn">
+          Upload solutions.json
+          <input type="file" accept=".json" style="display:none" onchange="uploadSolutionsJson(this)">
+        </label>
+      </div>
+    </div>
+  </div>
 </div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 const STAGES = [
@@ -344,7 +484,10 @@ let stageResults = {};
 window.addEventListener("load", () => {
   const params = new URLSearchParams(window.location.search);
   const sid = params.get("session");
-  if (sid) {
+  const view = params.get("view");
+  if (view === "settings") {
+    showSettings();
+  } else if (sid) {
     restoreSession(sid);
   } else {
     loadRecentSessions();
@@ -693,7 +836,185 @@ async function redeploySession() {
 }
 
 function escapeHtml(s) {
+  if (typeof s !== "string") return "";
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+let _teamList = [];
+
+function showSettings() {
+  showView("view-settings");
+  document.getElementById("nav-settings").textContent = "Back";
+  document.getElementById("nav-settings").setAttribute("onclick", "hideSettings()");
+  history.replaceState(null, "", "?view=settings");
+  loadTeam();
+  loadSolutions();
+}
+
+function hideSettings() {
+  showView("view-upload");
+  document.getElementById("nav-settings").textContent = "Settings";
+  document.getElementById("nav-settings").setAttribute("onclick", "showSettings()");
+  history.replaceState(null, "", window.location.pathname);
+  loadRecentSessions();
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("visible");
+  setTimeout(() => t.classList.remove("visible"), 2000);
+}
+
+// Team
+async function loadTeam() {
+  const res = await fetch("/api/team");
+  const data = await res.json();
+  _teamList = data.team || [];
+  renderTeam();
+}
+
+function renderTeam() {
+  const el = document.getElementById("team-list");
+  el.innerHTML = _teamList.map((name, i) =>
+    `<span class="team-chip">${escapeHtml(name)}<span class="remove" onclick="removeTeamMember(${i})">x</span></span>`
+  ).join("");
+  document.getElementById("team-count").textContent = `${_teamList.length} members`;
+}
+
+async function addTeamMember() {
+  const input = document.getElementById("team-name-input");
+  const name = input.value.trim();
+  if (!name) return;
+  _teamList.push(name);
+  input.value = "";
+  renderTeam();
+  await saveTeam();
+}
+
+async function removeTeamMember(index) {
+  const name = _teamList[index];
+  _teamList.splice(index, 1);
+  renderTeam();
+  await saveTeam();
+  showToast(`Removed ${name}`);
+}
+
+async function saveTeam() {
+  await fetch("/api/team", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ team: _teamList }),
+  });
+  showToast("Team saved");
+}
+
+// Solutions
+async function loadSolutions() {
+  const res = await fetch("/api/solutions");
+  const data = await res.json();
+  const solutions = data.solutions || [];
+  const wrap = document.getElementById("solutions-table-wrap");
+  if (!solutions.length) {
+    wrap.innerHTML = '<p style="color:#555;font-size:0.82rem;">No solutions yet. Add one below.</p>';
+    return;
+  }
+  wrap.innerHTML = `<table class="sol-table">
+    <thead><tr><th>Name</th><th>Type</th><th>Source</th><th>URL</th><th></th></tr></thead>
+    <tbody>${solutions.map(s => `<tr>
+      <td><span class="sol-name">${escapeHtml(s.name)}</span><br><span class="sol-id">${s.id}</span></td>
+      <td>${escapeHtml(s.demo_type || "-")}</td>
+      <td>${s.source || "-"}</td>
+      <td>${s.demo_url ? `<a href="${s.demo_url}" target="_blank" style="color:#5b6af0;font-size:0.78rem;">Open</a>` : "-"}</td>
+      <td><span class="sol-delete" onclick="deleteSolution('${s.id}','${escapeHtml(s.name)}')">Delete</span></td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+async function addSolution() {
+  const name = document.getElementById("sol-name").value.trim();
+  if (!name) { alert("Name is required"); return; }
+  const keywords = document.getElementById("sol-keywords").value.trim();
+  const body = {
+    name,
+    description: document.getElementById("sol-description").value.trim() || undefined,
+    demo_type: document.getElementById("sol-demo-type").value.trim() || undefined,
+    stack: document.getElementById("sol-stack").value.trim() || undefined,
+    keywords: keywords ? keywords.split(",").map(k => k.trim()).filter(Boolean) : undefined,
+    source: document.getElementById("sol-source").value,
+    demo_url: document.getElementById("sol-demo-url").value.trim() || undefined,
+    note: document.getElementById("sol-note").value.trim() || undefined,
+  };
+  const res = await fetch("/api/solutions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { const e = await res.json(); alert(e.detail || "Error"); return; }
+  const data = await res.json();
+  showToast(`Added ${name} (${data.id})`);
+  // Clear form
+  ["sol-name","sol-description","sol-demo-type","sol-stack","sol-keywords","sol-demo-url","sol-note"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("sol-source").value = "manual";
+  loadSolutions();
+}
+
+async function deleteSolution(id, name) {
+  if (!confirm(`Delete "${name}"?`)) return;
+  await fetch(`/api/solutions/${id}`, { method: "DELETE" });
+  showToast(`Deleted ${name}`);
+  loadSolutions();
+}
+
+// JSON file uploads
+function uploadTeamJson(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const team = data.team || data;
+      if (!Array.isArray(team)) throw new Error("Expected a 'team' array of name strings");
+      const names = team.map(t => typeof t === "string" ? t : t.name).filter(Boolean);
+      if (!names.length) throw new Error("No names found in file");
+      if (!confirm(`Replace current team with ${names.length} members from file?`)) return;
+      _teamList = names;
+      renderTeam();
+      await saveTeam();
+      showToast(`Imported ${names.length} team members`);
+    } catch(e) { alert("Invalid team JSON: " + e.message); }
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function uploadSolutionsJson(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const solutions = data.solutions || data;
+      if (!Array.isArray(solutions)) throw new Error("Expected a 'solutions' array");
+      if (!solutions.length) throw new Error("No solutions found in file");
+      if (!confirm(`Replace current solutions with ${solutions.length} entries from file?`)) return;
+      const res = await fetch("/api/solutions/bulk", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ solutions }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Upload failed"); }
+      showToast(`Imported ${solutions.length} solutions`);
+      loadSolutions();
+    } catch(e) { alert("Invalid solutions JSON: " + e.message); }
+    input.value = "";
+  };
+  reader.readAsText(file);
 }
 
 // ---------------------------------------------------------------------------

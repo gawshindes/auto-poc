@@ -460,3 +460,102 @@ async def debug_solutions():
         "count": len(entries),
         "solutions": [{"id": s.get("id"), "name": s.get("name")} for s in entries],
     })
+
+
+# ---------------------------------------------------------------------------
+# Settings API — Team & Solutions management
+# ---------------------------------------------------------------------------
+
+TEAM_PATH = PROJECT_ROOT / "registry" / "team.json"
+
+
+def _load_team() -> dict:
+    if TEAM_PATH.exists():
+        return json.loads(TEAM_PATH.read_text())
+    return {"team": []}
+
+
+def _save_team(data: dict) -> None:
+    TEAM_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TEAM_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+@app.get("/api/team")
+async def get_team():
+    return JSONResponse(_load_team())
+
+
+@app.put("/api/team")
+async def update_team(body: dict):
+    """Replace team list. Body: {"team": ["Name 1", "Name 2", ...]}"""
+    team = body.get("team")
+    if not isinstance(team, list):
+        raise HTTPException(status_code=422, detail="Body must have a 'team' array of name strings")
+    data = _load_team()
+    data["team"] = team
+    _save_team(data)
+    return JSONResponse({"ok": True, "count": len(team)})
+
+
+@app.get("/api/solutions")
+async def get_solutions():
+    return JSONResponse(_backend.get_solutions())
+
+
+@app.post("/api/solutions")
+async def add_solution(body: dict):
+    """Add a solution. Body: {name, description?, demo_type?, keywords?, stack?, source?, demo_url?, note?}"""
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Solution 'name' is required")
+    data = _backend.get_solutions()
+    existing_ids = [s.get("id", "") for s in data.get("solutions", [])]
+    max_num = 0
+    for sid in existing_ids:
+        parts = sid.split("_")
+        if len(parts) == 2 and parts[1].isdigit():
+            max_num = max(max_num, int(parts[1]))
+    new_id = f"sol_{max_num + 1:03d}"
+    entry = {
+        "id": new_id,
+        "name": name,
+        "source": body.get("source", "manual"),
+        "status": "built",
+    }
+    for field in ("description", "built_for", "demo_type", "keywords", "stack", "demo_url", "note"):
+        if body.get(field):
+            entry[field] = body[field]
+    _backend.append_solution(entry, data)
+    return JSONResponse({"ok": True, "id": new_id})
+
+
+@app.put("/api/solutions/bulk")
+async def bulk_replace_solutions(body: dict):
+    """Replace all solutions from uploaded JSON. Body: {"solutions": [...]}"""
+    solutions = body.get("solutions")
+    if not isinstance(solutions, list):
+        raise HTTPException(status_code=422, detail="Body must have a 'solutions' array")
+    # Ensure each entry has an id
+    for i, s in enumerate(solutions):
+        if not s.get("id"):
+            s["id"] = f"sol_{i + 1:03d}"
+        if not s.get("source"):
+            s["source"] = "manual"
+        if not s.get("status"):
+            s["status"] = "built"
+    data = _backend.get_solutions()
+    data["solutions"] = solutions
+    _backend.save_solutions(data)
+    return JSONResponse({"ok": True, "count": len(solutions)})
+
+
+@app.delete("/api/solutions/{solution_id}")
+async def delete_solution(solution_id: str):
+    data = _backend.get_solutions()
+    solutions = data.get("solutions", [])
+    before = len(solutions)
+    data["solutions"] = [s for s in solutions if s.get("id") != solution_id]
+    if len(data["solutions"]) == before:
+        raise HTTPException(status_code=404, detail="Solution not found")
+    _backend.save_solutions(data)
+    return JSONResponse({"ok": True})

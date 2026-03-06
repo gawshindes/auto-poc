@@ -6,14 +6,39 @@
     {
       "id": "sol_001",
       "name": "Voice Agent — Inbound + Outbound",
+      "description": "AI voice agent handling inbound customer calls and outbound follow-ups with natural conversation flow.",
+      "demo_type": "voice_agent",
+      "keywords": [
+        "voice",
+        "agent",
+        "inbound",
+        "outbound",
+        "calls",
+        "phone",
+        "11labs",
+        "conversational AI"
+      ],
+      "stack": "11Labs",
       "source": "manual",
       "demo_url": null,
       "status": "built",
-      "note": "Demoed created on 11labs — no URL needed"
+      "note": "Demo created on 11labs — no URL needed"
     },
     {
       "id": "sol_002",
       "name": "SEO + AO Content Generation Tool",
+      "description": "AI-powered tool for generating SEO-optimized and audience-optimized marketing content.",
+      "demo_type": "content_tool",
+      "keywords": [
+        "SEO",
+        "content",
+        "generation",
+        "marketing",
+        "copywriting",
+        "social media",
+        "AO"
+      ],
+      "stack": "Python + Claude API",
       "source": "manual",
       "demo_url": null,
       "status": "built",
