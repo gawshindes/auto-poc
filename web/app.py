@@ -1,0 +1,477 @@
+"""
+Web UI for the Demo Creation Pipeline.
+
+Run locally:
+    uvicorn web.app:app --reload --port 8000
+
+Deploy (Railway):
+    Procfile at repo root → web: uvicorn web.app:app --host 0.0.0.0 --port $PORT
+"""
+
+import asyncio
+import json
+import os
+import re
+import sys
+import threading
+import time
+import uuid
+from datetime import datetime
+from pathlib import Path
+
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+
+# Resolve project root (web/app.py → parent is project root)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "slack"))  # for deploy.py
+
+# Load .env file for local development (no-op if already set or file missing)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(PROJECT_ROOT / ".env")
+except ImportError:
+    pass
+
+# DATA_DIR: persistent storage root (set DATA_DIR=/data on Railway)
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).parent)))
+
+from pipeline import (
+    run_classifier, run_dependency_checker, run_solutions_matcher,
+    run_sdr_messenger, run_demo_builder, run_demo_guide,
+    append_to_registry, read_transcript,
+)
+
+app = FastAPI()
+
+SESSIONS_DIR = DATA_DIR / "sessions"
+SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+
+HTML_FILE = Path(__file__).parent / "index.html"
+
+# Per-session state: asyncio queues for SSE, threading events for verbose pausing
+_queues: dict[str, asyncio.Queue] = {}
+_pause_events: dict[str, threading.Event] = {}
+_input_values: dict[str, str] = {}
+_loop: asyncio.AbstractEventLoop | None = None
+
+
+# ---------------------------------------------------------------------------
+# Session helpers
+# ---------------------------------------------------------------------------
+
+def _session_path(session_id: str) -> Path:
+    return SESSIONS_DIR / f"{session_id}.json"
+
+
+def _load_session(session_id: str) -> dict:
+    p = _session_path(session_id)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Session not found")
+    return json.loads(p.read_text())
+
+
+def _save_session(session: dict) -> None:
+    session["updated_at"] = datetime.now().isoformat()
+    _session_path(session["session_id"]).write_text(json.dumps(session, indent=2))
+
+
+def _new_session(transcript: str, mode: str = "auto", email: str = "") -> dict:
+    session_id = str(uuid.uuid4())[:8]
+    session = {
+        "session_id": session_id,
+        "mode": mode,
+        "status": "idle",
+        "current_stage": 0,
+        "transcript": transcript,
+        "email": email or None,
+        "stage_1_classifier": None,
+        "stage_2_dependency": None,
+        "stage_3_matcher": None,
+        "stage_4_messenger": None,
+        "stage_5_demo": None,
+        "deploy_url": None,
+        "stage_6_guide": None,
+        "logs": [],
+        "error": None,
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+    }
+    _save_session(session)
+    return session
+
+
+# ---------------------------------------------------------------------------
+# SSE helpers — bridge background thread → async generator
+# ---------------------------------------------------------------------------
+
+def _push(session_id: str, event: str, data: dict) -> None:
+    """Called from background thread to push an SSE event."""
+    if session_id not in _queues or _loop is None:
+        return
+    payload = f"event: {event}\ndata: {json.dumps(data)}\n\n"
+    asyncio.run_coroutine_threadsafe(_queues[session_id].put(payload), _loop)
+
+
+def _log(session: dict, message: str) -> None:
+    session["logs"].append(message)
+    _save_session(session)
+    _push(session["session_id"], "log", {"message": message})
+
+
+# ---------------------------------------------------------------------------
+# Pipeline runner (background thread)
+# ---------------------------------------------------------------------------
+
+def _run_pipeline_thread(session: dict) -> None:
+    sid = session["session_id"]
+    mode = session["mode"]
+    verbose = mode == "verbose"
+
+    def pause_if_verbose(label: str, result_data: dict = None) -> None:
+        """In verbose mode, emit waiting event and block until /continue called."""
+        if not verbose:
+            return
+        session["status"] = "waiting_continue"
+        _save_session(session)
+        _push(sid, "waiting", {"reason": "continue", "label": label, "result": result_data})
+        _pause_events[sid].wait()
+        _pause_events[sid].clear()
+        session["status"] = "running"
+
+    try:
+        session["status"] = "running"
+        _save_session(session)
+
+        # Stage 1 — Classifier
+        session["current_stage"] = 1
+        _log(session, "Stage 1 — Classifier started")
+        t = time.time()
+        classifier = run_classifier(session["transcript"])
+        session["stage_1_classifier"] = classifier
+        _log(session, f"Stage 1 — Classifier completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 1, "result": classifier})
+        _save_session(session)
+
+        if classifier.get("demo_decision") == "NO":
+            session["status"] = "done"
+            session["error"] = f"No demo needed: {classifier.get('reason', '')}"
+            _save_session(session)
+            _push(sid, "done", {"message": session["error"]})
+            return
+
+        pause_if_verbose("Stage 1 complete — Classifier", classifier)
+
+        # Stage 2 — Dependency Checker
+        session["current_stage"] = 2
+        _log(session, "Stage 2 — Dependency Checker started")
+        t = time.time()
+        dependency = run_dependency_checker(classifier)
+        # Override: any "needed before build" item blocks Stage 5
+        if any(
+            item.get("urgency", "").startswith("needed before build")
+            for item in dependency.get("ask_customer", [])
+        ):
+            dependency["can_build_immediately"] = False
+        session["stage_2_dependency"] = dependency
+        _log(session, f"Stage 2 — Dependency Checker completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 2, "result": dependency})
+        _save_session(session)
+
+        pause_if_verbose("Stage 2 complete — Dependency Checker", dependency)
+
+        # Stage 3 — Solutions Matcher
+        session["current_stage"] = 3
+        _log(session, "Stage 3 — Solutions Matcher started")
+        t = time.time()
+        matcher = run_solutions_matcher(classifier, dependency)
+        session["stage_3_matcher"] = matcher
+        _log(session, f"Stage 3 — Solutions Matcher completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 3, "result": matcher})
+        _save_session(session)
+
+        if not matcher.get("demo_needed", True):
+            session["status"] = "done"
+            session["error"] = matcher.get("reason", "Pipeline does not apply.")
+            _save_session(session)
+            _push(sid, "done", {"message": session["error"]})
+            return
+
+        pause_if_verbose("Stage 3 complete — Solutions Matcher", matcher)
+
+        # Stage 4 — SDR Messenger (only if customer input needed)
+        session["current_stage"] = 4
+        messenger_output = ""
+        ask_items = dependency.get("ask_customer", [])
+        if ask_items:
+            _log(session, "Stage 4 — SDR Messenger started")
+            t = time.time()
+            messenger_output = run_sdr_messenger(classifier, dependency, matcher)
+            session["stage_4_messenger"] = messenger_output
+            _log(session, f"Stage 4 — SDR Messenger completed in {time.time()-t:.1f}s")
+            _push(sid, "stage_done", {"stage": 4, "result": messenger_output})
+            _save_session(session)
+        else:
+            _log(session, "Stage 4 — SDR Messenger skipped (no customer input needed)")
+            _push(sid, "stage_done", {"stage": 4, "result": None, "skipped": True})
+
+        # Collect customer inputs if needed (always stop for this, even in auto mode)
+        customer_inputs = ""
+        if ask_items and not dependency.get("can_build_immediately"):
+            session["status"] = "waiting_input"
+            _save_session(session)
+            _push(sid, "waiting", {"reason": "input", "items": ask_items})
+            # Block until /input endpoint provides values
+            _pause_events[sid].wait()
+            _pause_events[sid].clear()
+            customer_inputs = _input_values.pop(sid, "")
+            session["status"] = "running"
+        elif verbose:
+            pause_if_verbose("Stage 4 complete — SDR Messenger", messenger_output or None)
+
+        # Stage 5 — Demo Builder
+        session["current_stage"] = 5
+        _log(session, "Stage 5 — Demo Builder started (this takes 30–60s)")
+        t = time.time()
+        demo = run_demo_builder(classifier, dependency, matcher,
+                                customer_inputs=customer_inputs)
+        session["stage_5_demo"] = demo
+        _log(session, f"Stage 5 — Demo Builder completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 5, "result": "Demo code generated"})
+        _save_session(session)
+
+        pause_if_verbose("Stage 5 complete — Demo built", {"lines": len(demo.splitlines())})
+
+        # Deploy
+        live_url = ""
+        try:
+            from deploy import deploy_demo, parse_demo_files, validate_demo_files, ValidationError
+            _log(session, "Validating demo files...")
+            files = parse_demo_files(demo)
+            validate_demo_files(files)
+            slug = re.sub(r"[^a-z0-9-]", "-",
+                          classifier.get("customer", {}).get("company", "demo").lower())
+            _log(session, f"Deploying to Railway (slug: {slug})...")
+            t = time.time()
+            live_url = deploy_demo(demo, slug, classifier=classifier)
+            session["deploy_url"] = live_url
+            _log(session, f"Deployed in {time.time()-t:.1f}s — {live_url}")
+            _push(sid, "log", {"message": f"Deployed: {live_url}"})
+            _save_session(session)
+        except Exception as deploy_err:
+            _log(session, f"Deploy skipped or failed: {deploy_err}")
+            _push(sid, "log", {"message": f"⚠ Deploy error: {deploy_err}"})
+
+        # Stage 6 — Demo Guide
+        session["current_stage"] = 6
+        _log(session, "Stage 6 — Demo Guide started")
+        t = time.time()
+        guide = run_demo_guide(classifier, demo, live_url=live_url)
+        session["stage_6_guide"] = guide
+        _log(session, f"Stage 6 — Demo Guide completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 6, "result": guide})
+        _save_session(session)
+
+        # Registry
+        new_id = append_to_registry(matcher, classifier, deploy_url=live_url or None)
+        if new_id:
+            _log(session, f"Registry updated: {new_id}")
+
+        # Email (auto mode only, if email provided)
+        if mode == "auto" and session.get("email"):
+            _send_email(session["email"], classifier, live_url, guide)
+            _log(session, f"Email sent to {session['email']}")
+
+        session["status"] = "done"
+        _save_session(session)
+        _push(sid, "done", {"deploy_url": live_url, "guide": guide})
+
+    except Exception as e:
+        session["status"] = "error"
+        session["error"] = str(e)
+        _save_session(session)
+        _push(sid, "error", {"message": str(e)})
+    finally:
+        # Sentinel to close SSE stream
+        if sid in _queues and _loop:
+            asyncio.run_coroutine_threadsafe(_queues[sid].put(None), _loop)
+
+
+def _send_email(email: str, classifier: dict, deploy_url: str, guide: str) -> None:
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if not resend_key:
+        return
+    try:
+        import resend
+        resend.api_key = resend_key
+        company = classifier.get("customer", {}).get("company", "your customer")
+        resend.Emails.send({
+            "from": "demos@resend.dev",
+            "to": [email],
+            "subject": f"Demo ready — {company}",
+            "html": (
+                f"<h2>Your demo is live</h2>"
+                f"<p><a href='{deploy_url}'>{deploy_url}</a></p>"
+                f"<h3>Demo Guide</h3><pre style='white-space:pre-wrap'>{guide}</pre>"
+            ),
+        })
+    except Exception:
+        pass  # Email is best-effort
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def _capture_loop():
+    global _loop
+    _loop = asyncio.get_event_loop()
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_ui():
+    return HTML_FILE.read_text()
+
+
+@app.post("/upload")
+async def upload_transcript(file: UploadFile = File(...)):
+    content = await file.read()
+    suffix = Path(file.filename).suffix.lower()
+
+    if suffix in (".txt", ".md"):
+        transcript = content.decode("utf-8").strip()
+    elif suffix == ".pdf":
+        try:
+            import pdfplumber, io as _io
+            with pdfplumber.open(_io.BytesIO(content)) as pdf:
+                parts = [p.extract_text() for p in pdf.pages if p.extract_text()]
+            transcript = "\n".join(parts).strip()
+            if not transcript:
+                raise HTTPException(status_code=422, detail="PDF is empty or unreadable — try a .txt export")
+        except ImportError:
+            raise HTTPException(status_code=500, detail="pdfplumber not installed")
+    else:
+        raise HTTPException(status_code=422, detail="Unsupported file type — upload .txt or .pdf")
+
+    session = _new_session(transcript)
+    return {"session_id": session["session_id"]}
+
+
+@app.post("/run/{session_id}")
+async def run_pipeline(session_id: str, body: dict):
+    session = _load_session(session_id)
+    if session["status"] not in ("idle", "error"):
+        raise HTTPException(status_code=409, detail="Pipeline already running or done")
+
+    session["mode"] = body.get("mode", "auto")
+    session["email"] = body.get("email") or None
+    session["status"] = "running"
+    _save_session(session)
+
+    _queues[session_id] = asyncio.Queue()
+    _pause_events[session_id] = threading.Event()
+
+    thread = threading.Thread(target=_run_pipeline_thread, args=(session,), daemon=True)
+    thread.start()
+
+    return {"started": True}
+
+
+@app.get("/stream/{session_id}")
+async def stream(session_id: str):
+    if session_id not in _queues:
+        # Session exists but no active stream — client reconnecting
+        session = _load_session(session_id)
+        if session["status"] == "done":
+            async def done_stream():
+                yield f"event: done\ndata: {json.dumps({'deploy_url': session.get('deploy_url',''), 'guide': session.get('stage_6_guide','')})}\n\n"
+            return StreamingResponse(done_stream(), media_type="text/event-stream")
+        # Create a new queue for re-connection; existing thread (if alive) won't use it
+        _queues[session_id] = asyncio.Queue()
+
+    async def event_generator():
+        queue = _queues[session_id]
+        try:
+            while True:
+                msg = await asyncio.wait_for(queue.get(), timeout=30)
+                if msg is None:
+                    break
+                yield msg
+        except asyncio.TimeoutError:
+            yield "event: ping\ndata: {}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/continue/{session_id}")
+async def continue_pipeline(session_id: str):
+    if session_id not in _pause_events:
+        raise HTTPException(status_code=404, detail="No active pipeline for this session")
+    session = _load_session(session_id)
+    session["status"] = "running"
+    _save_session(session)
+    _pause_events[session_id].set()
+    return {"ok": True}
+
+
+@app.post("/input/{session_id}")
+async def submit_input(session_id: str, body: dict):
+    if session_id not in _pause_events:
+        raise HTTPException(status_code=404, detail="No active pipeline for this session")
+    _input_values[session_id] = body.get("inputs", "")
+    session = _load_session(session_id)
+    session["status"] = "running"
+    _save_session(session)
+    _pause_events[session_id].set()
+    return {"ok": True}
+
+
+@app.get("/sessions")
+async def list_sessions():
+    sessions = []
+    if SESSIONS_DIR.exists():
+        for f in SESSIONS_DIR.glob("*.json"):
+            try:
+                s = json.loads(f.read_text())
+                classifier = s.get("stage_1_classifier") or {}
+                sessions.append({
+                    "session_id": s["session_id"],
+                    "company": classifier.get("company_name") or classifier.get("customer", {}).get("company", "Unknown"),
+                    "status": s.get("status", "unknown"),
+                    "current_stage": s.get("current_stage", 0),
+                    "created_at": s.get("created_at", ""),
+                    "updated_at": s.get("updated_at", ""),
+                })
+            except Exception:
+                pass
+    sessions.sort(key=lambda x: x["updated_at"], reverse=True)
+    return JSONResponse(sessions)
+
+
+@app.post("/redeploy/{session_id}")
+async def redeploy(session_id: str):
+    session = _load_session(session_id)
+    demo = session.get("stage_5_demo")
+    classifier = session.get("stage_1_classifier") or {}
+    if not demo:
+        raise HTTPException(status_code=400, detail="No demo code found in session. Run the full pipeline first.")
+    try:
+        from deploy import deploy_demo
+        slug = re.sub(r"[^a-z0-9-]", "-", classifier.get("customer", {}).get("company", "demo").lower())
+        live_url = deploy_demo(demo, slug, classifier=classifier)
+        session["deploy_url"] = live_url
+        _save_session(session)
+        return JSONResponse({"deploy_url": live_url})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/session/{session_id}")
+async def get_session(session_id: str):
+    session = _load_session(session_id)
+    # Don't send full transcript/demo in status check — too large
+    summary = {k: v for k, v in session.items() if k not in ("transcript", "stage_5_demo")}
+    return JSONResponse(summary)

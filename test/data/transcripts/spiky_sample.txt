@@ -1,0 +1,77 @@
+Meeting Title: Discovery Call — BrightSmile Dental Group
+Date: 2024-03-12
+Duration: 28 minutes
+Attendees: Jordan Reyes (SDR, Acme AI), Dr. Priya Nair (Owner, BrightSmile Dental Group)
+
+---
+
+[00:00:12] Jordan Reyes: Hi Dr. Nair, thanks so much for making time today. I know you're busy — I'll keep this tight. Can you tell me a bit about what's going on at BrightSmile right now?
+
+[00:00:24] Dr. Priya Nair: Sure. So we have three locations — Reno, Sparks, and Carson City. Between the three of them we have something like 2,400 active patients. The big headache right now is the front desk. We're getting probably 60 to 80 calls a day across the three locations, and a lot of them are the same questions over and over — office hours, do we take their insurance, can they get an appointment this week. My front desk staff are spending half their time answering stuff that's basically on our website already.
+
+[00:01:10] Jordan Reyes: Yeah that's a really common pattern. Are patients also reaching out through other channels — like your website, or text?
+
+[00:01:18] Dr. Priya Nair: We have a contact form on the website but honestly nobody uses it. Most people just call. We recently added a text line through our practice management software — that's Dentrix — but the staff still have to manually check it and reply. It's not really saving anyone any time.
+
+[00:01:45] Jordan Reyes: Got it. So what would be the dream outcome for you? If you could wave a wand, what changes?
+
+[00:01:52] Dr. Priya Nair: Honestly? If patients could just self-serve. Answer their own questions without calling. Book an appointment — or at least request one — without needing to reach a human. And ideally something that works after hours too, because we get a lot of voicemails at 8pm that we have to deal with the next morning.
+
+[00:02:20] Jordan Reyes: Makes sense. Do you have any specific appointment types that are more common — like cleanings, new patient exams?
+
+[00:02:27] Dr. Priya Nair: Cleanings are probably 40% of our volume. New patient exams are a big one too. Emergency visits are tricky — patients will call in pain and we obviously want to get those handled fast, but the chat could at least triage whether it's truly urgent or something that can wait.
+
+[00:02:58] Jordan Reyes: That's a really good use case. What does your current scheduling system look like? Is there a patient portal or is it all handled through the front desk?
+
+[00:03:07] Dr. Priya Nair: It's Dentrix. Patients can technically request appointments through the Dentrix patient portal, but adoption is really low — maybe 15% of our patients have set up a portal account. For everyone else it's a phone call.
+
+[00:03:28] Jordan Reyes: And how does your team feel about automation? Are they worried about it replacing them, or are they generally open?
+
+[00:03:34] Dr. Priya Nair: They're open as long as it doesn't make more work for them. Like if the bot books something incorrectly or double-books, that's a nightmare. So it has to be reliable. They'd be happy to have fewer routine calls — more time to actually help patients who are in the office.
+
+[00:04:02] Jordan Reyes: Totally. So the vision would be something like — a chat widget on your website and/or SMS, that can answer FAQs, help patients pick a time and location, then either confirm a booking or pass a request to the front desk for review?
+
+[00:04:18] Dr. Priya Nair: Exactly. And it should know things like which providers are accepting new patients, what our insurance network is, and ideally what appointment slots are open. Though I understand that last part might need to connect to Dentrix.
+
+[00:04:38] Jordan Reyes: Yes, a Dentrix integration is possible but it's a bit more involved — we can either do a real-time API connection or a simpler workflow where the bot captures the request and a confirmation goes to the patient once the front desk confirms. Which would work for you as a starting point?
+
+[00:04:55] Dr. Priya Nair: Either honestly. The request-and-confirm model is fine for now. As long as the patient gets a response within a few minutes, they're happy. The worst outcome is silence.
+
+[00:05:10] Jordan Reyes: Perfect. Last question — do you have a list of your most frequently asked questions? Like the top 10 things patients call about?
+
+[00:05:18] Dr. Priya Nair: Yes actually, my office manager made one. It's a Google Doc. I can share it with you — it's got the questions and the standard answers we give.
+
+[00:05:28] Jordan Reyes: That would be incredibly helpful. If you can share that, we can build a demo that's actually trained on your real FAQs rather than generic dental content. Should take us a couple of days to put together something you can actually see.
+
+[00:05:42] Dr. Priya Nair: Yeah let's do that. I'll send it over today.
+
+[00:05:46] Jordan Reyes: Perfect. I'll follow up with a calendar invite for a demo — probably early next week. Does Tuesday or Wednesday work?
+
+[00:05:52] Dr. Priya Nair: Wednesday works better.
+
+[00:05:55] Jordan Reyes: Wednesday it is. Thanks so much Dr. Nair — this was really helpful.
+
+[00:05:59] Dr. Priya Nair: Thanks Jordan, talk soon.
+
+---
+
+## Spiky AI Summary
+
+**Key Pain Points:**
+- 60–80 calls/day across 3 locations; majority are repetitive FAQ questions (hours, insurance, scheduling)
+- Front desk staff overwhelmed; after-hours voicemails create next-morning backlog
+- Low patient portal adoption (~15%) means phone remains dominant channel
+
+**Desired Outcome:**
+- AI chat agent (web widget + SMS) that handles FAQs, appointment requests, and basic triage
+- Must work after hours
+- Request-and-confirm booking model acceptable as a starting point (real-time Dentrix sync is a stretch goal)
+
+**Next Steps:**
+- Dr. Nair to share FAQ Google Doc today
+- Demo call scheduled for Wednesday next week
+- Demo to be built using real FAQ content from the shared doc
+
+**Systems Mentioned:** Dentrix (practice management / scheduling), patient portal (Dentrix native), SMS text line (Dentrix)
+
+**Signals:** High call volume, clear ROI for front desk time savings, open to automation, specific appointment types identified (cleanings, new patient exams, emergency triage)

@@ -1,0 +1,49 @@
+Meeting: RenoComputerFix Discovery Call
+Date: 2026-03-03
+Participants: Bharat Bhate (founder), Shivani Singh (SDR), Justin Pederson (customer)
+
+---
+
+Shivani: Hey Justin, thanks for jumping on. I'll let Bharat take it from here.
+
+Bharat: Justin, great to finally connect. Shivani mentioned you've got a pretty interesting setup with laptop inventory. Can you walk me through how things work today?
+
+Justin: Yeah so basically I run RenoComputerFix — we do refurbished laptops, repairs, that kind of thing. The issue is I've got a vendor, Electro Room Laptop Parts, who has a huge eBay store with like 200+ laptops. If a customer comes in and wants something I don't have on the shelf, I have to manually refer them to the eBay store. I get like a 10% kickback. It's terrible.
+
+Bharat: So you're losing the full margin every time they buy through the eBay store directly.
+
+Justin: Exactly. If I could just show those laptops on MY website with my own markup — say 30% — I'd be making 100% of the margin instead of 10%. But I don't have the time to manually copy 200 listings over and keep them updated.
+
+Bharat: What's your website built on?
+
+Justin: Squarespace. I know it's not the most flexible but it's what I know.
+
+Bharat: Got it. And the vendor's eBay store — is it public? Like anyone can browse it?
+
+Justin: Yeah totally public. It's Electro Room Laptop Parts on eBay. Just laptops though — they sell other parts too but I only care about the laptops.
+
+Shivani: And Justin, how often do they add new listings? Is this like weekly or daily?
+
+Justin: Pretty regularly. I'd say a few new ones a week, some sell out. I'd want my site to stay current.
+
+Bharat: Okay so here's what I'm thinking. We can build a pipeline that scrapes their eBay store — just the laptop listings — applies your markup automatically, and populates a page on your site. It would refresh on a schedule, maybe daily. So your site always shows live inventory with your pricing.
+
+Justin: That would be insane. That's exactly what I need.
+
+Bharat: The Squarespace API is a bit limited for programmatic updates, but we can spin up a separate product listing page — looks just like your site, same branding — and it shows the synced inventory. When a customer clicks to buy, it goes through you at your price.
+
+Justin: Yeah that works. Does it have to be Squarespace or can it be its own page?
+
+Bharat: It can be its own page. Cleaner actually. We'd match your colors and logo so it feels like part of your store.
+
+Justin: Love it. When can I see something?
+
+Bharat: Let me put something together and show you Monday. Same time work?
+
+Justin: Yeah Monday's good.
+
+Bharat: Perfect. I'll have a live demo ready — you'll see the vendor's laptops appearing on a mock version of your site with markup applied, refreshing automatically. If you like it, we build the real thing.
+
+Justin: Sounds great. Looking forward to it.
+
+Shivani: Awesome, we'll send a calendar invite. Talk Monday Justin!

@@ -1,0 +1,28 @@
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Claude Code
+.claude/
+
+# Runtime state & outputs
+web/sessions/
+test/data/outputs/
+slack/state/
+
+# Client transcripts (real PDFs contain customer data — keep only sample .txt files)
+test/data/transcripts/*.pdf
+
+# Internal team registry (contains team member names)
+registry/team.json
+
+# Solutions registry — runtime data, lives on Railway volume or local disk
+registry/solutions.json
