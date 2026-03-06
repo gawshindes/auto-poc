@@ -1,13 +1,7 @@
 {
-  "note": "List everyone on your internal team. The classifier uses this to distinguish your team members from the customer in a sales call transcript. Copy this file to team.json and fill in your team.",
+  "note": "All internal team members. Anyone NOT in this list is the CUSTOMER. The classifier reads ALL turns for context — this list is only used to identify who is NOT the customer.",
   "team": [
-    {
-      "name": "Alice Smith",
-      "role": "Account Executive"
-    },
-    {
-      "name": "Bob Jones",
-      "role": "Solutions Engineer"
-    }
+    "Alice Smith",
+    "Bob Jones"
   ]
 }

@@ -34,7 +34,7 @@ def _load_prompt(filename: str) -> str:
 
 
 def _load_registry(filename: str, default: dict | None = None) -> dict:
-    path = PROJECT_ROOT / "registry" / filename
+    path = DATA_DIR / "registry" / filename
     if not path.exists():
         if default is not None:
             return default

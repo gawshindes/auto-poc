@@ -22,8 +22,5 @@ slack/state/
 # Client transcripts (real PDFs contain customer data — keep only sample .txt files)
 test/data/transcripts/*.pdf
 
-# Internal team registry (contains team member names)
-registry/team.json
-
 # Solutions registry — runtime data, lives on Railway volume or local disk
 registry/solutions.json
