@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 
 # Resolve project root (web/app.py → parent is project root)
@@ -559,3 +559,59 @@ async def delete_solution(solution_id: str):
         raise HTTPException(status_code=404, detail="Solution not found")
     _backend.save_solutions(data)
     return JSONResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Admin API — protected by ADMIN_TOKEN Bearer header
+# ---------------------------------------------------------------------------
+
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
+
+
+def _require_admin(request: Request) -> None:
+    """Raise 401/403 if request lacks a valid ADMIN_TOKEN Bearer header."""
+    if not ADMIN_TOKEN:
+        raise HTTPException(
+            status_code=500,
+            detail="ADMIN_TOKEN env var is not set — admin endpoints are disabled",
+        )
+    auth = request.headers.get("Authorization", "")
+    token = auth.removeprefix("Bearer ").strip()
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Invalid or missing admin token")
+
+
+@app.delete("/admin/sessions")
+async def delete_sessions(request: Request, keep_last: int = 0):
+    """
+    Delete all sessions from the volume.
+
+    Query params:
+      keep_last=N  — keep the N most recently updated sessions (default 0 = delete all)
+
+    curl example:
+      curl -X DELETE "https://your-app.railway.app/admin/sessions" \\
+           -H "Authorization: Bearer $ADMIN_TOKEN"
+
+      curl -X DELETE "https://your-app.railway.app/admin/sessions?keep_last=5" \\
+           -H "Authorization: Bearer $ADMIN_TOKEN"
+    """
+    _require_admin(request)
+
+    sessions_dir = _backend._sessions_dir
+    if not sessions_dir.exists():
+        return JSONResponse({"ok": True, "deleted": 0, "kept": 0})
+
+    all_files = sorted(sessions_dir.glob("*.json"), key=lambda p: p.stat().st_mtime)
+
+    if keep_last > 0:
+        to_delete = all_files[:-keep_last] if len(all_files) > keep_last else []
+        kept = len(all_files) - len(to_delete)
+    else:
+        to_delete = all_files
+        kept = 0
+
+    for f in to_delete:
+        f.unlink()
+
+    return JSONResponse({"ok": True, "deleted": len(to_delete), "kept": kept})
