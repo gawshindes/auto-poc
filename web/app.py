@@ -615,3 +615,21 @@ async def delete_sessions(request: Request, keep_last: int = 0):
         f.unlink()
 
     return JSONResponse({"ok": True, "deleted": len(to_delete), "kept": kept})
+
+
+@app.delete("/admin/sessions/{session_id}")
+async def delete_session(session_id: str, request: Request):
+    """
+    Delete a single session by ID.
+
+    curl example:
+      curl -X DELETE "https://your-app.railway.app/admin/sessions/abc12345" \\
+           -H "Authorization: Bearer $ADMIN_TOKEN"
+    """
+    _require_admin(request)
+
+    session_file = _backend._sessions_dir / f"{session_id}.json"
+    if not session_file.exists():
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    session_file.unlink()
+    return JSONResponse({"ok": True, "deleted": session_id})
