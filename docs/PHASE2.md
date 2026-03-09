@@ -34,3 +34,27 @@ Currently `registry/team.json` and `registry/solutions.json` are edited manually
 - Single `/settings` page in the web UI covering both team + solutions management
 - CLI: `python onboard.py --team` and `python onboard.py --solutions` for headless setup
 - Validate entries against the expected schema before saving
+
+### 4. Custom branded demo domains
+
+Railway only supports custom domains per-service, making per-demo DNS changes too much work. Goal: every deployed demo automatically gets `clientname.demos.yourdomain.com` with zero Cloudflare touches per demo.
+
+**Approach — Wildcard DNS + proxy service:**
+- One-time Cloudflare setup: `*.demos.yourdomain.com` CNAME → a proxy Railway service
+- Proxy reads subdomain from Host header, looks up the real Railway URL, reverse-proxies the request
+- When `deploy.py` deploys a new demo, it calls `POST /_admin/register` on the proxy to register `slug → railway_url`
+- No DNS changes needed per demo after initial setup
+
+**Implementation:**
+- New `proxy/` directory: FastAPI reverse proxy service (deployed separately on Railway)
+  - `proxy/main.py` — reads Host header, loads slug→url registry from volume, proxies with httpx
+  - `/_admin/register` endpoint (Bearer token protected) — called by deploy.py after each deploy
+  - `/_admin/routes` endpoint — for debugging registered routes
+- Edit `slack/deploy.py` — call proxy register endpoint after successful Railway deploy, return branded URL
+- New env vars: `PROXY_URL`, `PROXY_ADMIN_TOKEN`, `PROXY_DOMAIN` (e.g. `demos.yourdomain.com`)
+- Proxy routes stored in `proxy_routes.json` on a Railway volume
+
+**Cloudflare DNS (one time):**
+```
+*.demos  CNAME  <proxy-service>.up.railway.app  (DNS only, not proxied)
+```

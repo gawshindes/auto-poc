@@ -43,6 +43,29 @@
       "demo_url": null,
       "status": "built",
       "note": "Marketing team's tool — contact Marketing for demo"
+    },
+    {
+      "id": "sol_003",
+      "name": "E-commerce Inventory Sync Pipeline (eBay → Website)",
+      "description": "Automated pipeline that scrapes vendor's eBay store, applies markup to laptop listings, and displays them on retailer's website with live inventory sync.",
+      "built_for": "RenoComputerFix",
+      "demo_type": "pipeline",
+      "keywords": [
+        "ecommerce",
+        "inventory",
+        "sync",
+        "ebay",
+        "scraping",
+        "markup",
+        "retail",
+        "laptops",
+        "dropship",
+        "pipeline"
+      ],
+      "stack": "Python + Playwright + Railway + Supabase",
+      "source": "demo_tool",
+      "status": "built",
+      "demo_url": null
     }
   ]
 }
