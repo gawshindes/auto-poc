@@ -13,6 +13,9 @@ __pycache__/
 # Claude Code
 .claude/
 
+# Solutions registry — contains customer info, managed on Railway volume
+registry/solutions.json
+
 # Runtime state & outputs
 sessions/
 web/sessions/
