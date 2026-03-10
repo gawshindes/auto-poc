@@ -36,22 +36,33 @@ If stage is NOT discovery, return:
 ```
 
 ### Step 2 — Match Against Solutions Registry
-For each solution in the registry, score the match:
 
-**Full match (score: high)**
-- Demo type matches exactly
-- 3+ keywords match the customer's use case
-- Status is `built` or `in_progress`
-- Action: Customize and reuse — do NOT rebuild
+Do NOT do keyword counting. Use your judgment to reason semantically about whether solutions are genuinely the same thing.
 
-**Partial match (score: medium)**
-- Demo type is similar OR 1-2 keywords match
-- Some components are reusable (e.g., same stack, similar data flow)
-- Action: Use as starting point, extend as needed
+For each solution in the registry, ask yourself:
 
-**No match (score: low)**
-- Use case is genuinely novel
-- Action: Build from scratch, then add to registry
+> "If a founder picked up this existing solution and showed it to this new customer, would the customer understand what they're getting? Would it solve the same core problem in the same fundamental way?"
+
+If the answer is **yes** → match exists. If **no, but parts are reusable** → partial match. If **no** → build new.
+
+**Full match** — The core workflow, problem, and interaction model are the same. The solution solves the same problem for a different customer, with surface-level customization (branding, data, context). The founder could demo the existing solution with only cosmetic changes.
+
+Examples of genuine full matches:
+- Registry has "inbound voice agent for appointment booking" → new customer wants "voice agent for booking property viewings" → **full match** (same workflow: caller → AI → slot booked)
+- Registry has "RFQ generation tool" → new customer wants "proposal generation tool for tenders" → **full match** (same workflow: spec input → AI writes document)
+
+Examples that are NOT full matches (even though both use AI):
+- Registry has "e-commerce inventory sync pipeline" → new customer wants "AI chat agent" → **no match**
+- Registry has "voice agent for outbound sales calls" → new customer wants "voice agent for inbound customer support" → **partial at best** (same tech, opposite flow, different UX)
+- Registry has solution built for a retail company → new customer is in healthcare with fundamentally different compliance constraints → **no match or partial**
+
+**Partial match** — Some components or technical infrastructure are reusable, but the demo would need meaningful new development, not just customization. Worth noting but still requires building.
+
+**No match** — The use case is genuinely different, or only surface-level similarities exist (both use AI, both have a dashboard, both handle data). When in doubt, default to no match.
+
+**Key principle: bias strongly toward "build_new."** A false match is worse than building fresh — it produces a demo that doesn't fit the customer's actual problem. A fresh build always works.
+
+**Customer-specific registry entries** (those with a `built_for` field) should almost never match a new customer unless the industry and workflow are identical, not just similar.
 
 ### Step 2b — Multi-Component Matching
 
@@ -68,6 +79,26 @@ For each component:
 
 The `build_instruction.what_to_add` list must contain ONLY the `build_new` components.
 `build_instruction.what_to_add` must be EMPTY for any component that already exists.
+
+### Step 2c — Full Match Shortcut (Stop the Pipeline Early)
+
+After completing `component_matches`, check whether the builder needs to run at all:
+
+**If ALL components have `action: "exists"` (regardless of whether a `demo_url` is set or not):**
+→ Return `demo_needed: false`. Everything is already built. No new code should be generated.
+
+```json
+{
+  "demo_needed": false,
+  "reason": "All required components already exist in the solutions library. No new demo needs to be built.",
+  "sdr_note": "Surface the existing solutions to the SDR: list each component, its source (manual or demo_tool), and demo_url if available."
+}
+```
+
+The SDR/founder will handle the demo from here — either sharing the live URL directly, or recording/running the manually-built solution.
+
+**If ANY component has `action: "build_new"`:**
+→ Always return `demo_needed: true`. Continue to builder.
 
 ### Step 3 — Customization Plan
 If full or partial match found, specify exactly what needs to change:
@@ -99,6 +130,19 @@ Common discovery gaps:
 - Timeline (when do they need this by?)
 - Budget signal (any number mentioned?)
 - Technical constraint (any specific platform or API limitation?)
+
+### Step 5 — Registry Decision
+
+Set `add_to_registry_after_build` to `true` ONLY if the solution being built is **generic and reusable** — meaning another customer in a different industry could realistically use it with minor customization.
+
+Set it to `false` if:
+- The demo is highly customer-specific (custom data schema, niche industry, one-off workflow)
+- The description is too narrow or specific to match any other customer
+- The solution is a one-time prototype unlikely to be reused
+
+**Default to `false`.** The registry should contain reusable building blocks, not a log of every demo ever built. Customer-specific demos pollute the registry and cause false matches on future runs.
+
+If `add_to_registry_after_build: true`, the `suggested_registry_entry.name` must be a **generic, reusable name** — NOT customer-specific. Wrong: `"Akrabi Groups — Student Matching Engine"`. Right: `"Student-Entrepreneur Matching Engine"`.
 
 ## Output Format
 
@@ -142,11 +186,10 @@ Common discovery gaps:
       "suggested_question": ""
     }
   ],
-  "add_to_registry_after_build": true,
+  "add_to_registry_after_build": false,
   "suggested_registry_entry": {
     "name": "",
     "description": "",
-    "keywords": [],
     "demo_type": "",
     "stack": ""
   }
@@ -226,8 +269,7 @@ Output:
   "add_to_registry_after_build": true,
   "suggested_registry_entry": {
     "name": "Akrabi Groups — Student-Entrepreneur Matching Engine",
-    "description": "Matches student profiles against entrepreneur opportunities using AI, with scoring and automated outreach.",
-    "keywords": ["matching", "students", "entrepreneurs", "profiles", "opportunities"],
+    "description": "Matches student profiles against entrepreneur opportunities using AI, with compatibility scoring and automated outreach.",
     "demo_type": "chat_agent",
     "stack": "Python + FastAPI + Claude API"
   }
@@ -284,7 +326,6 @@ Output:
   "suggested_registry_entry": {
     "name": "SVG Accessibility Converter (GIM)",
     "description": "Converts SVG diagrams into GIM-metadata-enriched accessible versions with audio descriptions, braille labels, and tactile output support.",
-    "keywords": ["svg", "accessibility", "braille", "tactile", "gim", "blind", "assistive technology", "stem diagrams", "maps"],
     "demo_type": "custom",
     "stack": "Python + Claude API + SVG parsing"
   }

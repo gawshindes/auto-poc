@@ -1,23 +1,13 @@
 {
   "version": "1.0",
-  "last_updated": "2026-03-06",
-  "note": "Add every completed demo here after it's built. This registry is checked BEFORE building anything new. A match means we customize an existing solution rather than building from scratch — saving hours. Partial matches mean we can use components. source field: 'manual' = built outside the deploy tool (no URL expected), 'demo_tool' = auto-deployed by deploy.py (Railway URL available).",
+  "last_updated": "2026-03-10",
+  "note": "Add every completed demo here after it's built. This registry is checked BEFORE building anything new. Matching is semantic — the LLM reads name, description, and demo_type to decide if a solution is reusable. source field: 'manual' = built outside the deploy tool (no URL expected), 'demo_tool' = auto-deployed by deploy.py (Railway URL available).",
   "solutions": [
     {
       "id": "sol_001",
       "name": "Voice Agent — Inbound + Outbound",
-      "description": "AI voice agent handling inbound customer calls and outbound follow-ups with natural conversation flow.",
+      "description": "AI voice agent handling inbound customer calls and outbound follow-ups with natural conversation flow. Conducts screening interviews, captures profile information, and routes or follows up automatically.",
       "demo_type": "voice_agent",
-      "keywords": [
-        "voice",
-        "agent",
-        "inbound",
-        "outbound",
-        "calls",
-        "phone",
-        "11labs",
-        "conversational AI"
-      ],
       "stack": "11Labs",
       "source": "manual",
       "demo_url": null,
@@ -27,17 +17,8 @@
     {
       "id": "sol_002",
       "name": "SEO + AO Content Generation Tool",
-      "description": "AI-powered tool for generating SEO-optimized and audience-optimized marketing content.",
+      "description": "AI-powered tool for generating SEO-optimized and audience-optimized marketing content. Takes a topic or product and outputs blog posts, social media copy, and meta descriptions tailored to the target audience.",
       "demo_type": "content_tool",
-      "keywords": [
-        "SEO",
-        "content",
-        "generation",
-        "marketing",
-        "copywriting",
-        "social media",
-        "AO"
-      ],
       "stack": "Python + Claude API",
       "source": "manual",
       "demo_url": null,
@@ -47,21 +28,9 @@
     {
       "id": "sol_003",
       "name": "E-commerce Inventory Sync Pipeline (eBay → Website)",
-      "description": "Automated pipeline that scrapes vendor's eBay store, applies markup to laptop listings, and displays them on retailer's website with live inventory sync.",
+      "description": "Automated pipeline that scrapes a vendor's eBay store, applies configurable markup to product listings, and syncs live inventory to a retailer's website. Specific to eBay-sourced dropship/resale operations.",
       "built_for": "RenoComputerFix",
       "demo_type": "pipeline",
-      "keywords": [
-        "ecommerce",
-        "inventory",
-        "sync",
-        "ebay",
-        "scraping",
-        "markup",
-        "retail",
-        "laptops",
-        "dropship",
-        "pipeline"
-      ],
       "stack": "Python + Playwright + Railway + Supabase",
       "source": "demo_tool",
       "status": "built",

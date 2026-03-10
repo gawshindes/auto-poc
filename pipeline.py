@@ -39,13 +39,14 @@ def _load_registry(filename: str, default: dict | None = None) -> dict:
 
 
 PROMPTS = {
-    "classifier":   _load_prompt("01_classifier.md"),
-    "dependency":   _load_prompt("02_dependency_checker.md"),
-    "capabilities": _load_prompt("capabilities.md"),
-    "matcher":      _load_prompt("03_solutions_matcher.md"),
-    "messenger":    _load_prompt("04_sdr_messenger.md"),
-    "builder":      _load_prompt("05_demo_builder.md"),
-    "guide":        _load_prompt("06_demo_guide.md"),
+    "classifier":       _load_prompt("01_classifier.md"),
+    "dependency":       _load_prompt("02_dependency_checker.md"),
+    "capabilities":     _load_prompt("capabilities.md"),
+    "matcher":          _load_prompt("03_solutions_matcher.md"),
+    "messenger":        _load_prompt("04_sdr_messenger.md"),
+    "builder":          _load_prompt("05_demo_builder.md"),
+    "ui_design_system": _load_prompt("ui_design_system.md"),
+    "guide":            _load_prompt("06_demo_guide.md"),
 }
 
 TEAM = _load_registry("team.json", default={"team": []})
@@ -148,7 +149,8 @@ def run_demo_builder(classifier_output: dict, dependency_output: dict,
         f"Classifier spec:\n{json.dumps(classifier_output, indent=2)}\n"
         f"Dependency spec:\n{json.dumps(dependency_output, indent=2)}\n"
         f"Solutions matcher:\n{json.dumps(matcher_output, indent=2)}\n"
-        f"Customer-provided inputs:\n{customer_inputs or 'None — build with mocks only'}"
+        f"Customer-provided inputs:\n{customer_inputs or 'None — build with mocks only'}\n\n"
+        f"UI Design System (apply to all HTML/CSS):\n{PROMPTS['ui_design_system']}"
     )
     return run_stage(PROMPTS["builder"], content, max_tokens=16000, strip_fences=False)
 
@@ -207,7 +209,6 @@ def append_to_registry(matcher_output: dict, classifier_output: dict,
         "description": suggested.get("description", ""),
         "built_for": customer.get("company", ""),
         "demo_type": suggested.get("demo_type") or classifier_output.get("demo_type", "custom"),
-        "keywords": suggested.get("keywords", []),
         "stack": suggested.get("stack", ""),
         "source": "demo_tool",
         "status": "built",
