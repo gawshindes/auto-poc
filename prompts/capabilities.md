@@ -48,6 +48,21 @@ Only ask for things the customer can provide in under an hour with zero IT invol
 | Brand assets | logo, brand colors, company colors | 5 minutes | Send your logo file and brand colors — we'll make the demo feel like yours |
 | Workflow confirmation | markup, percentage, pricing, threshold, rule | 2 minutes | Just confirming — [specific parameter] so we set this up the way you want |
 
+## Tech Stack Constraint
+
+**All demos must be built in Python. Never recommend or use React, Vue, Next.js, Vite, or any Node.js framework.**
+
+Our deploy pipeline validates for `main.py`, `requirements.txt`, and `Procfile`. A React project fails deploy every time.
+
+| Need | Use instead |
+|------|-------------|
+| Interactive UI | Plain HTML/JS served by FastAPI (`HTMLResponse` or Jinja2 templates) |
+| Real-time updates | FastAPI server-sent events or polling — not WebSockets with Node |
+| Charts / data viz | Chart.js via CDN in plain HTML — not React + Recharts |
+| Any frontend | Inline HTML/CSS/JS in a FastAPI Jinja2 template or `HTMLResponse` |
+
+The demo builder and dependency checker must always recommend: **Python + FastAPI + plain HTML/JS**.
+
 ## Hosting Decision Guide
 
 | Demo Type | Recommended Host |
