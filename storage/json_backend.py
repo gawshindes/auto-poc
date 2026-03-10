@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from storage import StorageBackend, PROJECT_ROOT
+from storage import StorageBackend
 
 
 class JsonFileBackend(StorageBackend):
@@ -19,29 +19,9 @@ class JsonFileBackend(StorageBackend):
 
     # -- Solutions -----------------------------------------------------------
 
-    def _seed_solutions(self) -> None:
-        """Create solutions.json from bundled example or empty."""
-        self._solutions_path.parent.mkdir(parents=True, exist_ok=True)
-        seed = PROJECT_ROOT / "registry" / "solutions.json"
-        if not seed.exists():
-            seed = PROJECT_ROOT / "registry" / "solutions.example.json"
-        if seed.exists():
-            self._solutions_path.write_text(seed.read_text())
-        else:
-            self._solutions_path.write_text(json.dumps({
-                "version": "1.0",
-                "last_updated": datetime.now().strftime("%Y-%m-%d"),
-                "solutions": [],
-            }, indent=2))
-
     def get_solutions(self) -> dict:
         if not self._solutions_path.exists():
-            self._seed_solutions()
-        else:
-            # Re-seed if existing file has empty solutions list (stale volume)
-            data = json.loads(self._solutions_path.read_text())
-            if not data.get("solutions"):
-                self._seed_solutions()
+            return {"version": "1.0", "solutions": []}
         return json.loads(self._solutions_path.read_text())
 
     def save_solutions(self, data: dict) -> None:

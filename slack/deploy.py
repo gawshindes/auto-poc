@@ -371,22 +371,18 @@ def wait_for_deploy(project_id: str, service_id: str, timeout: int = 300) -> Non
 # Registry writer
 # ---------------------------------------------------------------------------
 
-# Path is relative to project root (where bot is always run from)
-_SOLUTIONS_PATH = os.path.join(os.path.dirname(__file__), '..', 'registry', 'solutions.json')
-
-
 def register_deployment(slug: str, live_url: str, classifier: dict) -> None:
     """
-    Append a new demo_tool entry to registry/solutions.json after a successful deploy.
+    Append a new demo_tool entry to the solutions registry after a successful deploy.
 
     Args:
         slug:       URL-safe customer slug, e.g. "renocomputerfix"
         live_url:   Railway URL, e.g. "https://demo-renocomputerfix.up.railway.app"
         classifier: Output dict from run_classifier() — used for metadata
     """
-    registry_path = os.path.normpath(_SOLUTIONS_PATH)
-    with open(registry_path, 'r') as f:
-        registry = json.load(f)
+    from storage import get_backend
+    backend = get_backend()
+    registry = backend.get_solutions()
 
     # Auto-increment ID
     existing_ids = [s['id'] for s in registry['solutions']]
@@ -398,12 +394,6 @@ def register_deployment(slug: str, live_url: str, classifier: dict) -> None:
     demo_type = classifier.get('demo_type', 'custom')
     core_problem = classifier.get('core_problem', '')
     proposed_solution = classifier.get('proposed_solution', '')
-    systems = classifier.get('systems_mentioned', [])
-
-    # Build keyword list from systems + demo_type words
-    keywords = [kw.lower() for kw in systems]
-    if demo_type not in keywords:
-        keywords.insert(0, demo_type.replace('_', ' '))
 
     new_entry = {
         'id': new_id,
@@ -411,7 +401,6 @@ def register_deployment(slug: str, live_url: str, classifier: dict) -> None:
         'description': proposed_solution or core_problem or f"Demo built for {company}",
         'built_for': company,
         'demo_type': demo_type,
-        'keywords': keywords,
         'what_to_customize': classifier.get('constraints', []),
         'reuse_effort': 'low',
         'hosting': 'Railway',
@@ -421,10 +410,7 @@ def register_deployment(slug: str, live_url: str, classifier: dict) -> None:
         'demo_url': live_url,
     }
 
-    registry['solutions'].append(new_entry)
-
-    with open(registry_path, 'w') as f:
-        json.dump(registry, f, indent=2)
+    backend.append_solution(new_entry, registry)
 
 
 # ---------------------------------------------------------------------------

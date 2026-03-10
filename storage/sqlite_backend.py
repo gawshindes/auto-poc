@@ -74,17 +74,7 @@ class SqliteBackend(StorageBackend):
         conn.commit()
 
     def _seed_if_empty(self) -> None:
-        row = self._conn().execute("SELECT COUNT(*) FROM solutions").fetchone()
-        if row[0] > 0:
-            return
-        seed = PROJECT_ROOT / "registry" / "solutions.json"
-        if not seed.exists():
-            seed = PROJECT_ROOT / "registry" / "solutions.example.json"
-        if not seed.exists():
-            return
-        data = json.loads(seed.read_text())
-        for s in data.get("solutions", []):
-            self._insert_solution(s)
+        pass  # Settings UI manages the registry — no auto-seeding
 
     def _insert_solution(self, entry: dict) -> None:
         self._conn().execute(
