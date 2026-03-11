@@ -106,6 +106,24 @@
     transition: border-color 0.15s;
   }
   .email-row input:focus { border-color: #d97757; }
+  .context-row { margin-bottom: 20px; }
+  .context-row label { font-size: 0.78rem; color: #b0aea5; display: block; margin-bottom: 6px; font-family:'Roboto',sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; }
+  .context-row textarea {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #e8e6dc;
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #141413;
+    font-size: 0.875rem;
+    font-family: 'Open Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+    resize: vertical;
+    min-height: 80px;
+  }
+  .context-row textarea:focus { border-color: #d97757; }
+  .context-row .hint { font-size: 0.75rem; color: #b0aea5; margin-top: 4px; }
 
   .btn {
     background: #d97757;
@@ -175,6 +193,15 @@
 
   .stage-body { display: none; border-top: 1px solid #f0efe9; padding: 14px 16px; }
   .stage.expanded .stage-body { display: block; }
+
+  .stage-body-header { display:flex; justify-content:flex-end; margin-bottom:6px; }
+  .copy-btn {
+    font-size:0.72rem; color:#b0aea5; background:#f0efe9; border:1px solid #e8e6dc;
+    border-radius:6px; padding:3px 10px; cursor:pointer; font-family:'Roboto',sans-serif;
+    transition:background 0.15s, color 0.15s;
+  }
+  .copy-btn:hover { background:#e8e6dc; color:#4a4845; }
+  .copy-btn.copied { color:#788c5d; background:#e8eddf; border-color:#c8d8b8; }
 
   pre.output {
     background: #faf9f5;
@@ -372,6 +399,12 @@
         <div class="mode-title">Let Me Handle It</div>
         <div class="mode-desc">Runs all stages automatically. Only stops if customer inputs are needed. Get notified by email when done.</div>
       </div>
+    </div>
+
+    <div class="context-row">
+      <label>Additional context (optional)</label>
+      <textarea id="context-input" placeholder="E.g. focus on the scheduling feature, customer uses Shopify, build a dark-themed UI..."></textarea>
+      <div class="hint">This is sent directly to the demo builder — use it to guide the output.</div>
     </div>
 
     <div class="email-row" id="email-row">
@@ -598,10 +631,11 @@ async function handleFile(file) {
 // ---------------------------------------------------------------------------
 async function startPipeline() {
   const email = document.getElementById("email-input").value.trim();
+  const additional_context = document.getElementById("context-input").value.trim();
   const res = await fetch(`/run/${sessionId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode, email }),
+    body: JSON.stringify({ mode, email, additional_context }),
   });
   if (!res.ok) { const e = await res.json(); alert(e.detail || "Start failed"); return; }
 
@@ -622,14 +656,17 @@ function initPipelineView() {
 
   const list = document.getElementById("stage-list");
   list.innerHTML = STAGES.map(s => `
-    <div class="stage" id="stage-${s.id}" onclick="toggleStage(${s.id})"${s.id > 1 ? ' style="display:none"' : ''}>
-      <div class="stage-header">
+    <div class="stage" id="stage-${s.id}"${s.id > 1 ? ' style="display:none"' : ''}>
+      <div class="stage-header" onclick="toggleStage(${s.id})">
         <div class="stage-icon pending" id="icon-${s.id}">—</div>
         <div class="stage-name">${s.name}</div>
         <div class="stage-time" id="time-${s.id}"></div>
         <div class="stage-chevron">▶</div>
       </div>
-      <div class="stage-body">
+      <div class="stage-body" onclick="event.stopPropagation()">
+        <div class="stage-body-header">
+          <button class="copy-btn" id="copy-${s.id}" onclick="copyStageOutput(${s.id})">Copy</button>
+        </div>
         <pre class="output" id="output-${s.id}">Waiting...</pre>
       </div>
     </div>
@@ -639,6 +676,16 @@ function initPipelineView() {
 
 function toggleStage(id) {
   document.getElementById(`stage-${id}`).classList.toggle("expanded");
+}
+
+function copyStageOutput(id) {
+  const text = document.getElementById(`output-${id}`).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById(`copy-${id}`);
+    btn.textContent = "Copied!";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 2000);
+  });
 }
 
 function setStageState(id, state) {

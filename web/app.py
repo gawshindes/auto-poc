@@ -262,6 +262,10 @@ def _run_pipeline_thread(session: dict) -> None:
                 for r in resolved_answers
             )
             customer_inputs = (resolved_text + "\n\n" + customer_inputs).strip() if customer_inputs else resolved_text
+        # Append additional context provided at pipeline start
+        additional_context = session.get("additional_context") or ""
+        if additional_context:
+            customer_inputs = (customer_inputs + "\n\n[Additional context from operator]:\n" + additional_context).strip() if customer_inputs else f"[Additional context from operator]:\n{additional_context}"
         demo = run_demo_builder(classifier, dependency, matcher,
                                 customer_inputs=customer_inputs)
         session["stage_5_demo"] = demo
@@ -401,6 +405,7 @@ async def run_pipeline(session_id: str, body: dict):
 
     session["mode"] = body.get("mode", "auto")
     session["email"] = body.get("email") or None
+    session["additional_context"] = body.get("additional_context", "").strip() or None
     session["status"] = "running"
     _save_session(session)
 
