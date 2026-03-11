@@ -140,7 +140,7 @@ def parse_demo_files(demo_output: str) -> dict:
              + py_cmt_pat.findall(demo_output) + html_cmt_pat.findall(demo_output))
     files = {}
     for filename, content in pairs:
-        filename = filename.strip().strip("`").strip()
+        filename = filename.strip().strip("`").strip().rstrip(":- ")
         # Strip leading /demo-<slug>/ prefix that Claude sometimes adds
         filename = re.sub(r'^/demo-[^/]+/', '', filename)
         # Require at least one dot or a known extensionless name

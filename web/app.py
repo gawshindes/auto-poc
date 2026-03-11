@@ -268,6 +268,8 @@ def _run_pipeline_thread(session: dict) -> None:
             from deploy import deploy_demo, parse_demo_files, validate_demo_files, ValidationError
             _log(session, "Validating demo files...")
             files = parse_demo_files(demo)
+            file_summary = ", ".join(f"{k}({len(v)}B)" for k, v in files.items())
+            _log(session, f"Parsed files: {file_summary}")
             validate_demo_files(files)
             slug = re.sub(r"[^a-z0-9-]", "-",
                           classifier.get("customer", {}).get("company", "demo").lower())
@@ -477,6 +479,17 @@ async def get_session(session_id: str):
     # Don't send full transcript/demo in status check — too large
     summary = {k: v for k, v in session.items() if k not in ("transcript", "stage_5_demo")}
     return JSONResponse(summary)
+
+
+@app.get("/session/{session_id}/demo")
+async def get_session_demo(session_id: str):
+    session = _load_session(session_id)
+    demo = session.get("stage_5_demo") or ""
+    return JSONResponse({
+        "session_id": session_id,
+        "demo_length": len(demo),
+        "demo_output": demo,
+    })
 
 
 @app.get("/debug/solutions")
