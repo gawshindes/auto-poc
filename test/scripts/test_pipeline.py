@@ -391,8 +391,14 @@ def main():
     matcher = run_solutions_matcher(classifier, dependency)
     results["stage_3_matcher"] = matcher
 
-    if not matcher.get("demo_needed", True):
-        _warn("Pipeline exit", matcher.get("reason", ""))
+    # Skip builder if ALL components already exist in registry (Python decides, not LLM)
+    _component_matches = matcher.get("component_matches", [])
+    if _component_matches and all(
+        m.get("action", "build_new").startswith("exists")
+        for m in _component_matches
+    ):
+        sdr_note = matcher.get("build_instruction", {}).get("sdr_note", "")
+        _warn("All components exist — Stage 5 skipped", sdr_note or "No new build needed.")
         _save_results(results, args, customer)
         return
 

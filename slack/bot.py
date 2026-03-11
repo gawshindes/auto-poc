@@ -102,8 +102,17 @@ def _run_pipeline(transcript, channel_id, user_id, say):
 
         matcher = run_solutions_matcher(classifier, dependency)
 
-        if not matcher.get("demo_needed", True):
-            say(f"⏭️ *Pipeline skipped:* {matcher.get('reason', 'Not a discovery call.')}")
+        # Skip builder if ALL components already exist in registry (Python decides, not LLM)
+        _component_matches = matcher.get("component_matches", [])
+        if _component_matches and all(
+            m.get("action", "build_new").startswith("exists")
+            for m in _component_matches
+        ):
+            existing_urls = [m["demo_url"] for m in _component_matches if m.get("demo_url")]
+            sdr_note = matcher.get("build_instruction", {}).get("sdr_note", "")
+            msg = sdr_note or "All required components already exist in solutions library."
+            url_line = f"\nExisting demo: {existing_urls[0]}" if existing_urls else ""
+            say(f"*All components exist — no new build needed.*\n{msg}{url_line}")
             return
 
         messenger_output = ""

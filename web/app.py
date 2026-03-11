@@ -202,11 +202,20 @@ def _run_pipeline_thread(session: dict) -> None:
         _push(sid, "stage_done", {"stage": 3, "result": matcher})
         _save_session(session)
 
-        if not matcher.get("demo_needed", True):
+        # Skip Stage 5 if ALL components already exist in registry (Python decides, not LLM)
+        _component_matches = matcher.get("component_matches", [])
+        if _component_matches and all(
+            m.get("action", "build_new").startswith("exists")
+            for m in _component_matches
+        ):
+            existing_urls = [m["demo_url"] for m in _component_matches if m.get("demo_url")]
+            sdr_note = matcher.get("build_instruction", {}).get("sdr_note", "")
+            msg = sdr_note or "All required components already exist in solutions library."
+            _log(session, "Stage 5 skipped — all components exist in library.")
             session["status"] = "done"
-            session["error"] = matcher.get("reason", "Pipeline does not apply.")
+            session["deploy_url"] = existing_urls[0] if existing_urls else None
             _save_session(session)
-            _push(sid, "done", {"message": session["error"]})
+            _push(sid, "done", {"deploy_url": existing_urls[0] if existing_urls else "", "guide": msg})
             return
 
         pause_if_verbose("Stage 3 complete — Solutions Matcher", matcher)
@@ -268,6 +277,10 @@ def _run_pipeline_thread(session: dict) -> None:
             from deploy import deploy_demo, parse_demo_files, validate_demo_files, ValidationError
             _log(session, "Validating demo files...")
             files = parse_demo_files(demo)
+            # stdlib-only demos (e.g. http.server) legitimately have no dependencies —
+            # inject an empty requirements.txt so the validator and Railway don't reject them
+            if "requirements.txt" not in files and "main.py" in files:
+                files["requirements.txt"] = ""
             file_summary = ", ".join(f"{k}({len(v)}B)" for k, v in files.items())
             _log(session, f"Parsed files: {file_summary}")
             validate_demo_files(files)
