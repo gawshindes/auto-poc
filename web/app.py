@@ -35,8 +35,8 @@ except ImportError:
     pass
 
 from pipeline import (
-    run_classifier, run_dependency_checker, run_solutions_matcher,
-    run_sdr_messenger, run_demo_builder, run_demo_guide,
+    run_classifier, run_dependency_checker, run_knowledge_resolver,
+    run_solutions_matcher, run_sdr_messenger, run_demo_builder, run_demo_guide,
     append_to_registry, read_transcript,
 )
 from storage import get_backend
@@ -173,6 +173,25 @@ def _run_pipeline_thread(session: dict) -> None:
 
         pause_if_verbose("Stage 2 complete — Dependency Checker", dependency)
 
+        # Stage 2b — Knowledge Resolver (auto-fill ask_customer items from general knowledge)
+        resolver = {}
+        if dependency.get("ask_customer"):
+            _log(session, "Stage 2b — Knowledge Resolver started")
+            t = time.time()
+            resolver = run_knowledge_resolver(classifier, dependency)
+            session["stage_2b_resolver"] = resolver
+            resolved_count = len(resolver.get("resolved", []))
+            still_need = resolver.get("still_need_from_customer", [])
+            _log(session, f"Stage 2b — Knowledge Resolver completed in {time.time()-t:.1f}s"
+                          f" ({resolved_count} items self-served, {len(still_need)} still need customer)")
+            _push(sid, "stage_done", {"stage": "2b", "result": resolver})
+            _save_session(session)
+            # Patch dependency output: replace ask_customer with only truly needed items
+            dependency["ask_customer"] = still_need
+            if resolver.get("can_build_immediately"):
+                dependency["can_build_immediately"] = True
+            dependency["resolved_by_knowledge"] = resolver.get("resolved", [])
+
         # Stage 3 — Solutions Matcher
         session["current_stage"] = 3
         _log(session, "Stage 3 — Solutions Matcher started")
@@ -226,6 +245,14 @@ def _run_pipeline_thread(session: dict) -> None:
         session["current_stage"] = 5
         _log(session, "Stage 5 — Demo Builder started (this takes 30–60s)")
         t = time.time()
+        # Merge resolver answers into customer_inputs so builder has the domain knowledge
+        resolved_answers = resolver.get("resolved", [])
+        if resolved_answers:
+            resolved_text = "\n\n".join(
+                f"[Auto-resolved] {r['dependency']}:\n{r['answer']}"
+                for r in resolved_answers
+            )
+            customer_inputs = (resolved_text + "\n\n" + customer_inputs).strip() if customer_inputs else resolved_text
         demo = run_demo_builder(classifier, dependency, matcher,
                                 customer_inputs=customer_inputs)
         session["stage_5_demo"] = demo

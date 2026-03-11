@@ -39,14 +39,15 @@ def _load_registry(filename: str, default: dict | None = None) -> dict:
 
 
 PROMPTS = {
-    "classifier":       _load_prompt("01_classifier.md"),
-    "dependency":       _load_prompt("02_dependency_checker.md"),
-    "capabilities":     _load_prompt("capabilities.md"),
-    "matcher":          _load_prompt("03_solutions_matcher.md"),
-    "messenger":        _load_prompt("04_sdr_messenger.md"),
-    "builder":          _load_prompt("05_demo_builder.md"),
-    "ui_design_system": _load_prompt("ui_design_system.md"),
-    "guide":            _load_prompt("06_demo_guide.md"),
+    "classifier":         _load_prompt("01_classifier.md"),
+    "dependency":         _load_prompt("02_dependency_checker.md"),
+    "knowledge_resolver": _load_prompt("02b_knowledge_resolver.md"),
+    "capabilities":       _load_prompt("capabilities.md"),
+    "matcher":            _load_prompt("03_solutions_matcher.md"),
+    "messenger":          _load_prompt("04_sdr_messenger.md"),
+    "builder":            _load_prompt("05_demo_builder.md"),
+    "ui_design_system":   _load_prompt("ui_design_system.md"),
+    "guide":              _load_prompt("06_demo_guide.md"),
 }
 
 TEAM = _load_registry("team.json", default={"team": []})
@@ -131,6 +132,29 @@ def run_solutions_matcher(classifier_output: dict, dependency_output: dict) -> d
         f"Solutions registry:\n{json.dumps(solutions, indent=2)}"
     )
     return _parse_json(run_stage(PROMPTS["matcher"], content), "Solutions Matcher")
+
+
+def run_knowledge_resolver(classifier_output: dict, dependency_output: dict) -> dict:
+    """
+    Try to self-serve ask_customer items from general/industry knowledge.
+    Returns a resolver dict with 'resolved', 'still_need_from_customer', 'can_build_immediately'.
+    If ask_customer is empty, returns a no-op result immediately without an API call.
+    """
+    ask_items = dependency_output.get("ask_customer", [])
+    if not ask_items:
+        return {
+            "resolved": [],
+            "still_need_from_customer": [],
+            "can_build_immediately": True,
+        }
+    content = (
+        f"Classifier output:\n{json.dumps(classifier_output, indent=2)}\n\n"
+        f"Dependency Checker ask_customer items:\n{json.dumps(ask_items, indent=2)}"
+    )
+    return _parse_json(
+        run_stage(PROMPTS["knowledge_resolver"], content, max_tokens=2000),
+        "Knowledge Resolver",
+    )
 
 
 def run_sdr_messenger(classifier_output: dict, dependency_output: dict,

@@ -125,14 +125,15 @@ def parse_demo_files(demo_output: str) -> dict:
 
     Falls back to {"demo.md": demo_output} if no structured blocks found.
     """
-    # Four patterns covering all formats Claude uses:
+    # Five patterns covering all formats Claude uses:
     #   **filename.py**[optional text]\n```lang\n<content>\n```
-    #   ## filename.py\n```lang\n<content>\n```
+    #   ## filename.py\n```lang\n<content>\n```  (1–4 hashes, with or without backtick-wrapped name)
     #   ```lang\n# filename.py\n<content>\n```        (Python/shell comment)
     #   ```lang\n<!-- filename.html -->\n<content>\n```  (HTML comment)
     # (?:```|$) lets us recover the last file even if output was truncated mid-block
-    bold_pat    = re.compile(r'\*\*([^\n*`#]{1,80})\*\*[^\n]*\n+```[^\n]*\n(.*?)(?:```|$)', re.DOTALL)
-    head_pat    = re.compile(r'#{1,3}\s+([^\n*`#]{1,80})\n+```[^\n]*\n(.*?)(?:```|$)', re.DOTALL)
+    # Filename capture allows backticks so ` `main.py` ` headers are handled
+    bold_pat    = re.compile(r'\*\*`?([^\n*#]{1,80}?)`?\*\*[^\n]*\n+```[^\n]*\n(.*?)(?:```|$)', re.DOTALL)
+    head_pat    = re.compile(r'#{1,4}\s+`?([^\n*#]{1,80}?)`?[ \t]*\n+```[^\n]*\n(.*?)(?:```|$)', re.DOTALL)
     py_cmt_pat  = re.compile(r'```[^\n]*\n#\s*([a-zA-Z0-9_./-]{1,80})\n(.*?)(?:```|$)', re.DOTALL)
     html_cmt_pat = re.compile(r'```[^\n]*\n<!--\s*([a-zA-Z0-9_./-]{1,80})\s*-->\n(.*?)(?:```|$)', re.DOTALL)
     pairs = (bold_pat.findall(demo_output) + head_pat.findall(demo_output)

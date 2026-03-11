@@ -95,10 +95,11 @@ Concrete test: Can the founder change the input and see a different output? If n
 - Deploy to Modal (background jobs) or Railway (web services)
 
 ### For Chat / AI Interface demos:
-- React frontend (Vite) or plain HTML/JS for simplicity
+- Plain HTML/JS served by FastAPI (`HTMLResponse` or Jinja2 template) — never React, Vite, or Node
 - Claude API (claude-sonnet-4-20250514) as the LLM
 - System prompt crafted from the customer's specific use case
-- Deploy to Railway or Vercel
+- Chat history maintained server-side in a JSON file or in-memory list
+- Deploy to Railway
 
 ### For Transcript / Document / Freeform Text demos:
 When the wow moment involves processing a document, transcript, call recording summary, email, or any freeform text — use this pattern without exception:
@@ -141,6 +142,7 @@ async def process(body: dict):
 ```
 
 ### For Dashboard / Data Viz demos:
+
 - React + Recharts or plain HTML + Chart.js
 - Mock data structured to look like real business data
 - No backend needed unless data needs to feel "live"
@@ -260,6 +262,41 @@ Always deploy. A link is infinitely more impressive than "run this locally."
    - Any exact-pinned package that requires compilation from source (C extensions, Rust) — if you must use such a package, use `>=` with a recent version that has pre-built wheels
 
 If the demo serves any HTML/JS, use Python's built-in `http.server` or FastAPI — never Node unless the whole stack is JS.
+
+## Output Format — File Syntax (MANDATORY)
+
+Every file in your output MUST use this exact format. The deploy pipeline parses your output using this pattern — any deviation silently loses the file and causes a "Missing required file" deploy error.
+
+```
+## filename.ext
+
+```lang
+<file content>
+```
+```
+
+Rules:
+- Exactly two hashes (`##`), a space, then the bare filename — no backticks, no parenthetical notes, nothing else on the header line
+- The code fence language tag is optional but must appear on the same line as the opening ` ``` `
+- Do NOT nest files under subdirectories in the header (write `main.py`, not `demo/main.py`)
+- `data/fallback.json` is the one exception — write `## data/fallback.json`
+
+Correct:
+```
+## main.py
+
+```python
+<code>
+```
+```
+
+Wrong (will be silently dropped):
+```
+## `main.py`            <- backticks in header
+### main.py             <- 3 hashes
+## main.py (FastAPI)    <- extra text in header
+**main.py**             <- bold instead of header
+```
 
 ## Output Structure
 
