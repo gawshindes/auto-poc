@@ -12,8 +12,8 @@ class ValidationError(Exception):
     pass
 
 
-# Packages that will break Railway builds on Python 3.13
-_BANNED_PACKAGES = ["playwright", "greenlet"]
+# Packages that will break Railway builds or are explicitly forbidden
+_BANNED_PACKAGES = ["playwright", "greenlet", "openai"]  # openai: no OPENAI_API_KEY on Railway
 _BANNED_PYDANTIC = re.compile(r"pydantic\s*[=<>!]=?\s*2\.[0-6]\b|pydantic\s*[=<>!]=?\s*1\.")
 
 
@@ -68,6 +68,14 @@ def validate_demo_files(files: dict) -> list:
         compile(main_content, "main.py", "exec")
     except SyntaxError as e:
         raise ValidationError(f"Syntax error in main.py: {e}")
+
+    # 5. JSON syntax check for data files (malformed JSON crashes app at startup)
+    for fname, fcontent in files.items():
+        if fname.endswith(".json") and fcontent.strip():
+            try:
+                json.loads(fcontent)
+            except json.JSONDecodeError as e:
+                raise ValidationError(f"Malformed JSON in {fname}: {e}")
 
     return warnings
 

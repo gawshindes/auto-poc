@@ -256,12 +256,31 @@ Always deploy. A link is infinitely more impressive than "run this locally."
    jinja2>=3.1.0
    ```
 
+   **Always include when making AI calls:**
+   ```
+   anthropic>=0.30.0
+   ```
+
    **Never include:**
+   - `openai` — this agency uses Anthropic/Claude only. There is no `OPENAI_API_KEY`. Any demo using `openai` will crash immediately on startup.
    - `playwright` or `greenlet` — browser binaries can't be installed
    - `pydantic<2.7` — `pydantic-core` older than 2.7 requires Rust compilation that fails on Python 3.13; use plain Python dicts instead, or omit pydantic entirely
    - Any exact-pinned package that requires compilation from source (C extensions, Rust) — if you must use such a package, use `>=` with a recent version that has pre-built wheels
 
 If the demo serves any HTML/JS, use Python's built-in `http.server` or FastAPI — never Node unless the whole stack is JS.
+
+4. **Defensive JSON loading** — Never load JSON data files at module level without error handling.
+   A malformed JSON file will crash the entire process before it can start. Always use this pattern:
+   ```python
+   def load_json(path, default=None):
+       try:
+           with open(path) as f:
+               return json.load(f)
+       except (FileNotFoundError, json.JSONDecodeError):
+           return default if default is not None else []
+   ```
+   Call this instead of bare `json.load(open(...))`. If a data file is truncated or malformed,
+   the app starts with empty fallback data rather than crashing.
 
 ## Output Format — File Syntax (MANDATORY)
 
