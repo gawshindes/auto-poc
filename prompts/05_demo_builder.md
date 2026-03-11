@@ -33,31 +33,63 @@ This demo has ONE job: make the customer say "I get it, this is real, I want thi
 Build the minimum that achieves the wow moment. Cut everything else.
 
 ### Look Real, Not Be Real
-The demo does not need to use the customer's actual systems.
+**Scope: external data sources only.**
+The demo does not need to use the customer's actual CRM, ERP, or live feed.
 It needs to LOOK like it does. A founder can always say
 "in production this connects to your actual [system]."
 They cannot recover from a demo that isn't ready.
+
+**What "Look Real" means in practice:**
+- Mock the data sources (fake CRM records, fake inventory, fake leads)
+- Use realistic field names, realistic values, realistic volume (10-20 records)
+- Do NOT mock the AI step — see "The AI Must Be Real" below
+
+### The AI Must Be Real — No Exceptions
+
+**The Claude API call is never optional. Never return a hardcoded AI response.**
+
+This is the single most important rule. Violating it produces a dead demo.
+
+MOCK these (external systems that might need IT access or have API friction):
+- CRM data (Salesforce, HubSpot) → realistic fake JSON
+- ERP / inventory → seeded JSON
+- Web scraping results → fallback JSON if scraper is blocked
+- Payment/billing data → simulated responses
+
+NEVER mock these — they must always be real:
+- The Claude API response to user input
+- The AI analysis, generation, or transformation output
+- Any step where the customer's data goes in and AI magic comes out
+
+If the wow moment is "paste your transcript → get a proposal," the AI must process the actual input the user provides. The output must differ when the input differs. A hardcoded response is not a demo — it's a mockup, and founders cannot sell from mockups.
 
 ### Self-Contained
 The demo must run with a single command. No 30-minute setup.
 Include a README that a non-technical SDR can follow.
 
 ### Fail Gracefully
-Always include fallback mock data in case a live API is slow or blocked during the demo.
-The demo should NEVER crash in front of a customer.
+**Scope: external data sources and scrapers only — not AI processing.**
+
+Always include fallback mock data in case a live API or scraper is slow or blocked during the demo. The demo should NEVER crash in front of a customer.
+
+Fallback = a JSON file of pre-fetched realistic data to display when an external source fails.
+Fallback ≠ a hardcoded AI response. The AI endpoint must always call Claude.
+
+### Every Demo Must Be Interactive
+
+**"A static info page is never acceptable" means:**
+- There must be at least ONE user action that triggers a visible, dynamic change
+- If the wow moment is AI processing → that action must call the Claude API
+- The output must visibly differ based on the input (not identical every time)
+
+Concrete test: Can the founder change the input and see a different output? If no → rebuild it.
 
 ## Tech Stack Guidelines
 
 ### For Pipeline / Automation demos:
 - Python preferred (readable, fast to write)
 - **Never use Playwright** — Railway cannot install browser binaries, build will fail
-- For web/eBay/product data: use **Serper API** (key injected as `SERPER_API_KEY`):
-  ```python
-  requests.post("https://google.serper.dev/shopping",
-      headers={"X-API-KEY": os.environ["SERPER_API_KEY"]},
-      json={"q": "site:ebay.com laptop electro room", "num": 10})
-  ```
-- For simple static HTML pages: `requests` + `beautifulsoup4`
+- For web scraping: `requests` + `beautifulsoup4`
 - JSON files for mock data stores; fallback JSON always included
 - FastAPI for any backend endpoints needed
 - Deploy to Modal (background jobs) or Railway (web services)
@@ -67,6 +99,46 @@ The demo should NEVER crash in front of a customer.
 - Claude API (claude-sonnet-4-20250514) as the LLM
 - System prompt crafted from the customer's specific use case
 - Deploy to Railway or Vercel
+
+### For Transcript / Document / Freeform Text demos:
+When the wow moment involves processing a document, transcript, call recording summary, email, or any freeform text — use this pattern without exception:
+
+**Required UI elements:**
+- A prominent textarea (or file upload) for the user to paste/drop their input
+- A clearly labeled action button ("Analyze", "Generate", "Process") as the primary CTA
+- A loading/spinner state shown while Claude is processing
+- A results panel that renders the AI output after the call completes
+
+**Required backend:**
+- A `/process` (or similar) POST endpoint that accepts the raw text
+- Calls `anthropic.messages.create(model="claude-sonnet-4-20250514", ...)` with the user's actual input
+- Returns the AI-generated result as JSON
+
+**Pre-loaded example:**
+- Always pre-populate the textarea with a realistic example input (a short transcript snippet, a sample email, etc.) so the founder can hit "Generate" immediately without typing anything
+- This example lives in `data/example_input.txt` — load it on page render
+
+**What NOT to do:**
+- Do not display a static result on page load
+- Do not hardcode the AI output in a `data/` file
+- Do not skip the input field and show a pre-generated "sample analysis"
+
+```python
+# Minimal FastAPI pattern
+@app.post("/process")
+async def process(body: dict):
+    text = body.get("text", "")
+    if not text.strip():
+        return {"error": "No input provided"}
+    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    msg = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1500,
+        system="[customer-specific system prompt]",
+        messages=[{"role": "user", "content": text}],
+    )
+    return {"result": msg.content[0].text}
+```
 
 ### For Dashboard / Data Viz demos:
 - React + Recharts or plain HTML + Chart.js

@@ -166,3 +166,8 @@ Output:
   }
 }
 ```
+
+## Tech Constraint
+
+Never recommend Playwright for web scraping. Railway cannot install browser binaries — the build will fail every time.
+Use `requests` + `beautifulsoup4` for HTML scraping of public pages.
