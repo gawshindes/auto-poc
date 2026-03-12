@@ -251,10 +251,13 @@ Always deploy. A link is infinitely more impressive than "run this locally."
    ```
    fastapi>=0.110.0
    uvicorn>=0.27.0
+   python-multipart>=0.0.9
    requests>=2.31.0
    beautifulsoup4>=4.12.0
    jinja2>=3.1.0
    ```
+
+   **`python-multipart` is mandatory in the safe baseline.** FastAPI requires it at startup whenever any route uses `Form(...)` parameters — even if no form submissions happen. Missing it causes an immediate `RuntimeError` and crashes the container before it can serve a single request. Always include it.
 
    **Always include when making AI calls:**
    ```
