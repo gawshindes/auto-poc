@@ -445,6 +445,12 @@ def deploy_demo(demo_output: str, slug: str, classifier: dict = None) -> str:
     Returns:
         Live URL string, e.g. "https://demo-renocomputerfix.up.railway.app"
     """
+    
+    # Railway project names have a 32 character limit. "demo-" is 5 chars.
+    # We limit the slug to 25 chars and strip leading/trailing hyphens.
+    slug = re.sub(r"[^a-z0-9-]", "-", slug.lower())
+    slug = re.sub(r"-+", "-", slug).strip("-")[:25].strip("-")
+
     # Step 0 — parse files
     files = parse_demo_files(demo_output)
 
