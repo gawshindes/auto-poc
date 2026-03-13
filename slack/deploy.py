@@ -74,8 +74,32 @@ def validate_demo_files(files: dict) -> list:
         if fname.endswith(".json") and fcontent.strip():
             try:
                 json.loads(fcontent)
-            except json.JSONDecodeError as e:
-                raise ValidationError(f"Malformed JSON in {fname}: {e}")
+            except json.JSONDecodeError as base_e:
+                # LLM output truncated? Attempt simple fix
+                fixed = fcontent.strip()
+                if fixed.count('"') % 2 != 0:
+                    fixed += '"'
+                    
+                open_braces = fixed.count('{')
+                close_braces = fixed.count('}')
+                open_brackets = fixed.count('[')
+                close_brackets = fixed.count(']')
+                
+                # Rough fix: append closing brackets/braces based on count difference
+                # Order matters slightly, but typically LLMs end inside a string, then value, then obj/array
+                while open_brackets > close_brackets or open_braces > close_braces:
+                    if open_braces > close_braces:
+                        fixed += '}'
+                        close_braces += 1
+                    else:
+                        fixed += ']'
+                        close_brackets += 1
+                try:
+                    json.loads(fixed)
+                    files[fname] = fixed  # Save the fixed version
+                    warnings.append(f"Auto-fixed malformed JSON in {fname}")
+                except json.JSONDecodeError:
+                    raise ValidationError(f"Malformed JSON in {fname}: {base_e} (auto-fix failed)")
 
     return warnings
 
