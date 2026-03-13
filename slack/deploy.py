@@ -335,6 +335,38 @@ def create_railway_project(slug: str, github_repo: str) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# Step 3.5: Railway — inject environment variables
+# ---------------------------------------------------------------------------
+
+def inject_railway_variables(project_id: str, environment_id: str, service_id: str) -> None:
+    """Push the Anthropic API key to the newly created Railway service."""
+    variables = {}
+    
+    # Pass along any AI API keys present in the local environment
+    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        val = os.environ.get(key)
+        if val:
+            variables[key] = val
+            
+    if not variables:
+        return
+        
+    _railway(
+        """mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) {
+             variableCollectionUpsert(input: $input)
+           }""",
+        {
+            "input": {
+                "projectId": project_id,
+                "environmentId": environment_id,
+                "serviceId": service_id,
+                "variables": variables
+            }
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # Step 4: Railway — trigger deploy
 # ---------------------------------------------------------------------------
 
@@ -483,6 +515,9 @@ def deploy_demo(demo_output: str, slug: str, classifier: dict = None) -> str:
 
     # Step 3 — Railway project + service
     project_id, environment_id, service_id = create_railway_project(slug, full_name)
+
+    # Step 3.5 — Inject environment variables (API Keys)
+    inject_railway_variables(project_id, environment_id, service_id)
 
     # Step 4 — trigger deploy + provision domain in parallel order
     trigger_railway_deploy(service_id, environment_id)
