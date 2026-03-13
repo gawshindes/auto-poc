@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-CLI test runner for the demo creation pipeline.
-Runs all 5 stages against a transcript file — no Slack required.
+CLI test runner for the demo creation pipeline (4-stage).
+Runs all stages against a transcript file — no Slack required.
 
 Usage:
     python test/scripts/test_pipeline.py                                                   # built-in sample transcript
@@ -35,8 +35,7 @@ TRANSCRIPTS_DIR = PROJECT_ROOT / "test" / "data" / "transcripts"
 # Import shared pipeline module
 sys.path.insert(0, str(PROJECT_ROOT))
 from pipeline import (
-    run_classifier, run_dependency_checker, run_solutions_matcher,
-    run_sdr_messenger, run_demo_builder, run_demo_guide,
+    run_understand, run_design, run_build, run_guide,
     append_to_registry, read_transcript, PROMPTS,
 )
 
@@ -99,9 +98,9 @@ def main():
               python test/scripts/test_pipeline.py
               python test/scripts/test_pipeline.py test/data/transcripts/renocomputerfix.txt
               python test/scripts/test_pipeline.py transcript.txt --deploy
-              python test/scripts/test_pipeline.py transcript.txt --stage 3
+              python test/scripts/test_pipeline.py transcript.txt --stage 2
               python test/scripts/test_pipeline.py --redeploy latest
-              python test/scripts/test_pipeline.py --rebuild-demo latest              # re-run only stage 5
+              python test/scripts/test_pipeline.py --rebuild-demo latest              # re-run only stage 3
               python test/scripts/test_pipeline.py --rebuild-demo latest --deploy    # rebuild + deploy
         """),
     )
@@ -114,14 +113,14 @@ def main():
     parser.add_argument(
         "--deploy",
         action="store_true",
-        help="After stage 5, trigger full GitHub + Railway deploy",
+        help="After stage 3, trigger full GitHub + Railway deploy",
     )
     parser.add_argument(
         "--stage",
         type=int,
-        choices=[1, 2, 3, 4, 5],
-        default=5,
-        help="Stop after this stage (default: 5 = run all)",
+        choices=[1, 2, 3, 4],
+        default=4,
+        help="Stop after this stage (default: 4 = run all)",
     )
     parser.add_argument(
         "--out",
@@ -138,7 +137,7 @@ def main():
         "--rebuild-demo",
         metavar="JSON_FILE",
         default=None,
-        help="Load stages 1-4 from saved JSON, re-run only stage 5 (optionally with --deploy)",
+        help="Load stages 1-2 from saved JSON, re-run only stage 3 (optionally with --deploy)",
     )
     args = parser.parse_args()
 
@@ -156,26 +155,26 @@ def main():
             redeploy_path = str(candidates[-1])
             _ok("Using latest", redeploy_path)
         saved = json.loads(Path(redeploy_path).read_text())
-        demo = saved.get("stage_5_demo")
-        classifier = saved.get("stage_1_classifier", {})
-        customer = classifier.get("customer", {})
+        demo = saved.get("stage_3_demo")
+        understand = saved.get("stage_1_understand", {})
+        customer = understand.get("customer", {})
 
         if not demo:
-            _die(f"No stage_5_demo found in {args.redeploy}. Run with --stage 5 first.")
+            _die(f"No stage_3_demo found in {args.redeploy}. Run with --stage 3 first.")
 
         _header(f"Redeploy from {args.redeploy}")
         slug = _re.sub(r"[^a-z0-9-]", "-", customer.get("company", "demo").lower())
         _ok("Slug", slug)
         t = time.time()
         try:
-            live_url = deploy_demo(demo, slug, classifier=classifier)
+            live_url = deploy_demo(demo, slug, classifier=understand)
             _ok("Deployed", _elapsed(t))
             print(f"\n  {GREEN}{BOLD}🚀  {live_url}{RESET}\n")
         except Exception as e:
             _warn("Deploy failed", str(e))
         return
 
-    # ── Rebuild demo — load stages 1-4 from JSON, re-run only stage 5 ────
+    # ── Rebuild demo — load stages 1-2 from JSON, re-run only stage 3 ────
     if args.rebuild_demo:
         import re as _re
         rebuild_path = args.rebuild_demo
@@ -187,25 +186,18 @@ def main():
             _ok("Using latest", rebuild_path)
 
         saved = json.loads(Path(rebuild_path).read_text())
-        classifier = saved.get("stage_1_classifier", {})
-        dependency = saved.get("stage_2_dependency", {})
-        matcher = saved.get("stage_3_matcher", {})
-        customer = classifier.get("customer", {})
+        understand = saved.get("stage_1_understand", {})
+        design = saved.get("stage_2_design", {})
+        customer = understand.get("customer", {})
 
-        if not classifier or not dependency or not matcher:
-            _die(f"Missing stages 1-3 in {rebuild_path}. Run full pipeline first.")
+        if not understand or not design:
+            _die(f"Missing stages 1-2 in {rebuild_path}. Run full pipeline first.")
 
-        # Mirror the can_build override
-        if any(
-            item.get("urgency", "").startswith("needed before build")
-            for item in dependency.get("ask_customer", [])
-        ):
-            dependency["can_build_immediately"] = False
-        can_build = dependency.get("can_build_immediately", False)
+        can_build = understand.get("can_build_immediately", False)
 
         # Prompt for customer inputs
         customer_inputs = ""
-        ask_items = dependency.get("ask_customer", [])
+        ask_items = understand.get("dependencies", {}).get("ask_customer", [])
         if ask_items:
             _header("Customer Inputs")
             print(f"  {DIM}Enter values the customer needs to provide. Press Enter to skip any item.{RESET}\n")
@@ -232,17 +224,16 @@ def main():
                 _ok("No inputs provided", "building with mocks")
 
         if not can_build and not customer_inputs:
-            _warn("Skipped", "can_build_immediately=False and no customer inputs — pass eBay URL above")
+            _warn("Skipped", "can_build_immediately=False and no customer inputs provided")
             return
 
-        _header("Stage 5 — Demo Builder (rebuild)")
+        _header("Stage 3 — Build (rebuild)")
         t = time.time()
-        demo = run_demo_builder(classifier, dependency, matcher,
-                                customer_inputs=customer_inputs)
+        demo = run_build(design, customer_inputs=customer_inputs)
         _ok("Completed", _elapsed(t))
 
         # Update saved JSON with new demo
-        saved["stage_5_demo"] = demo
+        saved["stage_3_demo"] = demo
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         slug = _re.sub(r"[^a-z0-9_]", "_", customer.get("company", "run").lower())[:20]
         OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -279,25 +270,25 @@ def main():
             slug = _re.sub(r"[^a-z0-9-]", "-", customer.get("company", "demo").lower())
             t = time.time()
             try:
-                live_url = deploy_demo(demo, slug, classifier=classifier)
+                live_url = deploy_demo(demo, slug, classifier=understand)
                 saved["deploy_url"] = live_url
                 _ok("Deployed", _elapsed(t))
                 print(f"\n  {GREEN}{BOLD}🚀  {live_url}{RESET}\n")
             except Exception as e:
                 _warn("Deploy failed", str(e))
 
-        # Demo Guide
-        _header("Stage 6 — Demo Guide")
+        # Stage 4 — Guide
+        _header("Stage 4 — Guide")
         if live_url and not args.deploy:
             _ok("Using existing deploy URL", live_url)
         t = time.time()
-        guide = run_demo_guide(classifier, demo, live_url=live_url)
+        guide = run_guide(understand, demo, live_url=live_url)
         _ok("Completed", _elapsed(t))
         print()
         for line in guide.splitlines():
             print(f"  {line}")
         print()
-        append_to_registry(matcher, classifier, deploy_url=live_url or None)
+        append_to_registry(design, understand, deploy_url=live_url or None)
         return
 
     # Verify project structure is intact
@@ -320,139 +311,98 @@ def main():
     results = {}
     run_start = time.time()
 
-    # ── Stage 1: Classifier ──────────────────────────────────────────────
-    _header("Stage 1 — Classifier")
+    # ── Stage 1: Understand ──────────────────────────────────────────────
+    _header("Stage 1 — Understand")
     t = time.time()
-    classifier = run_classifier(transcript)
-    results["stage_1_classifier"] = classifier
+    understand = run_understand(transcript)
+    results["stage_1_understand"] = understand
     _ok("Completed", _elapsed(t))
 
-    decision = classifier.get("demo_decision", "?")
-    customer = classifier.get("customer", {})
+    decision = understand.get("demo_decision", "?")
+    customer = understand.get("customer", {})
     _ok("Customer", f"{customer.get('name')} @ {customer.get('company')}")
     _ok("Demo decision", decision)
     if decision == "YES":
-        _ok("Demo type", classifier.get("demo_type", "?"))
-        _ok("Wow moment", classifier.get("wow_moment", "?"))
+        _ok("Demo type", understand.get("demo_type", "?"))
+        _ok("Demo approach", understand.get("demo_approach", "?"))
+        _ok("Wow moment", understand.get("wow_moment", "?"))
         print()
         print(f"  {BOLD}Problem understood:{RESET}")
-        print(f"  {DIM}{classifier.get('core_problem', '—')}{RESET}")
+        print(f"  {DIM}{understand.get('core_problem', '—')}{RESET}")
         print()
         print(f"  {BOLD}Proposed solution:{RESET}")
-        print(f"  {DIM}{classifier.get('proposed_solution', '—')}{RESET}")
-        systems = classifier.get("systems_mentioned", [])
+        print(f"  {DIM}{understand.get('proposed_solution', '—')}{RESET}")
+        systems = understand.get("systems_mentioned", [])
         if systems:
             print()
             print(f"  {BOLD}Systems mentioned:{RESET}  {DIM}{', '.join(systems)}{RESET}")
-        constraints = classifier.get("constraints", [])
-        if constraints:
-            print()
-            print(f"  {BOLD}Constraints:{RESET}")
-            for c in constraints:
-                print(f"  {DIM}• {c}{RESET}")
+        deps = understand.get("dependencies", {})
+        ask_items = deps.get("ask_customer", [])
+        resolved = deps.get("resolved_by_knowledge", [])
+        can_build = understand.get("can_build_immediately", False)
+        _ok("Can build immediately", str(can_build))
+        if resolved:
+            _ok("Self-resolved items", str(len(resolved)))
+        if ask_items:
+            _warn("Customer input needed", f"{len(ask_items)} item(s)")
     else:
-        _warn("Pipeline exit", classifier.get("reason", ""))
+        _warn("Pipeline exit", understand.get("reason", ""))
         _save_results(results, args, customer)
-        print(f"\n{YELLOW}Stopped: classifier returned demo_decision=NO{RESET}\n")
+        print(f"\n{YELLOW}Stopped: understand returned demo_decision=NO{RESET}\n")
         return
 
     if args.stage < 2:
         _save_results(results, args, customer)
         return
 
-    # ── Stage 2: Dependency Checker ──────────────────────────────────────
-    _header("Stage 2 — Dependency Checker")
+    # ── Stage 2: Design ──────────────────────────────────────────────────
+    _header("Stage 2 — Design")
     t = time.time()
-    dependency = run_dependency_checker(classifier)
-    results["stage_2_dependency"] = dependency
+
+    # Merge resolved knowledge into customer inputs for design
+    customer_inputs = ""
+    if resolved:
+        customer_inputs = "\n\n".join(
+            f"[Auto-resolved] {r['dependency']}:\n{r['answer']}"
+            for r in resolved
+        )
+
+    design = run_design(understand, customer_inputs)
+    results["stage_2_design"] = design
     _ok("Completed", _elapsed(t))
 
-    # Mirror bot.py: any "needed before build" item overrides can_build_immediately
-    if any(
-        item.get("urgency", "").startswith("needed before build")
-        for item in dependency.get("ask_customer", [])
-    ):
-        dependency["can_build_immediately"] = False
-
-    can_build = dependency.get("can_build_immediately", False)
-    ask_customer = dependency.get("ask_customer", False)
-    _ok("Can build immediately", str(can_build))
-    if ask_customer:
-        _warn("Customer input needed", "SDR messenger stage will run")
-    _preview(dependency)
-
-    if args.stage < 3:
-        _save_results(results, args, customer)
-        return
-
-    # ── Stage 3: Solutions Matcher ────────────────────────────────────────
-    _header("Stage 3 — Solutions Matcher")
-    t = time.time()
-    matcher = run_solutions_matcher(classifier, dependency)
-    results["stage_3_matcher"] = matcher
-
-    # Skip builder if ALL components already exist in registry (Python decides, not LLM)
-    _component_matches = matcher.get("component_matches", [])
+    # Skip build if ALL components exist
+    _component_matches = design.get("component_matches", [])
     if _component_matches and all(
         m.get("action", "build_new").startswith("exists")
         for m in _component_matches
     ):
-        sdr_note = matcher.get("build_instruction", {}).get("sdr_note", "")
-        _warn("All components exist — Stage 5 skipped", sdr_note or "No new build needed.")
+        sdr_note = design.get("build_instruction", {}).get("sdr_note", "")
+        _warn("All components exist — Build skipped", sdr_note or "No new build needed.")
         _save_results(results, args, customer)
         return
 
-    _ok("Completed", _elapsed(t))
-    match = matcher.get("match_result", {})
-    build = matcher.get("build_instruction", {})
-    _ok("Match type", match.get("type", "?"))
-    if match.get("matched_solution"):
-        _ok("Matched solution", match["matched_solution"])
-        source = build.get("source", "?")
-        demo_url = build.get("demo_url")
-        _ok("Source", source)
-        if source == "demo_tool" and demo_url:
-            _ok("Live URL (existing)", demo_url)
-        elif source == "manual":
-            _warn("No URL", "Solution was built manually — founder must share/record")
-        if build.get("sdr_note"):
-            _ok("SDR note", build["sdr_note"])
+    build = design.get("build_instruction", {})
     _ok("Approach", build.get("approach", "?"))
     _ok("Estimated effort", build.get("estimated_effort", "?"))
 
-    gaps = matcher.get("discovery_gaps", [])
+    gaps = design.get("discovery_gaps", [])
     if gaps:
         print(f"\n  {BOLD}Discovery gaps:{RESET}")
         for g in gaps[:3]:
             print(f"  {YELLOW}•{RESET} {g.get('gap')}: {DIM}{g.get('suggested_question')}{RESET}")
 
-    if args.stage < 4:
+    sdr_msg = design.get("sdr_message", {})
+    if sdr_msg.get("needed"):
+        print(f"\n  {BOLD}SDR Email Draft:{RESET}")
+        for line in sdr_msg.get("email_draft", "").splitlines():
+            print(f"  {DIM}{line}{RESET}")
+
+    if args.stage < 3:
         _save_results(results, args, customer)
         return
 
-    # ── Stage 4: SDR Messenger (only if customer input needed) ───────────
-    messenger_output = ""
-    if ask_customer:
-        _header("Stage 4 — SDR Messenger")
-        t = time.time()
-        messenger_output = run_sdr_messenger(classifier, dependency, matcher)
-        results["stage_4_messenger"] = messenger_output
-        _ok("Completed", _elapsed(t))
-        print()
-        for line in messenger_output.splitlines():
-            print(f"  {line}")
-    else:
-        _header("Stage 4 — SDR Messenger")
-        _ok("Skipped", "No customer input needed — can build immediately")
-        results["stage_4_messenger"] = None
-
-    if args.stage < 5:
-        _save_results(results, args, customer)
-        return
-
-    # ── Customer input prompts (before Stage 5) ───────────────────────────
-    customer_inputs = ""
-    ask_items = dependency.get("ask_customer", [])
+    # ── Customer input prompts (before Stage 3) ───────────────────────────
     if ask_items:
         _header("Customer Inputs")
         print(f"  {DIM}Enter values the customer needs to provide. Press Enter to skip any item.{RESET}\n")
@@ -473,27 +423,26 @@ def main():
                 answers.append(f"{dep}: {val}")
             print()
         if answers:
-            customer_inputs = "\n".join(answers)
+            extra = "\n".join(answers)
+            customer_inputs = (customer_inputs + "\n\n" + extra).strip() if customer_inputs else extra
             _ok("Customer inputs collected", f"{len(answers)} item(s)")
         else:
             _ok("No inputs provided", "building with mocks")
 
-    # ── Stage 5: Demo Builder ─────────────────────────────────────────────
+    # ── Stage 3: Build ─────────────────────────────────────────────────
     if not can_build and not customer_inputs:
-        _header("Stage 5 — Demo Builder")
+        _header("Stage 3 — Build")
         _warn("Skipped", "can_build_immediately=False and no customer inputs provided")
-        results["stage_5_demo"] = None
+        results["stage_3_demo"] = None
         _save_results(results, args, customer)
         return
 
-    _header("Stage 5 — Demo Builder")
+    _header("Stage 3 — Build")
     t = time.time()
-    demo = run_demo_builder(classifier, dependency, matcher,
-                            customer_inputs=customer_inputs)
-    results["stage_5_demo"] = demo
+    demo = run_build(design, customer_inputs=customer_inputs)
+    results["stage_3_demo"] = demo
     _ok("Completed", _elapsed(t))
     print()
-    # Print first 80 lines of demo output
     lines = demo.splitlines()
     for line in lines[:80]:
         print(f"  {DIM}{line}{RESET}")
@@ -529,7 +478,7 @@ def main():
             slug = _re.sub(r"[^a-z0-9-]", "-",
                            customer.get("company", "demo").lower())
             t = time.time()
-            live_url = deploy_demo(demo, slug, classifier=classifier)
+            live_url = deploy_demo(demo, slug, classifier=understand)
             results["deploy_url"] = live_url
             _ok("Deployed", _elapsed(t))
             print(f"\n  {GREEN}{BOLD}🚀  {live_url}{RESET}\n")
@@ -537,11 +486,11 @@ def main():
             _warn("Deploy failed", str(e))
             results["deploy_error"] = str(e)
 
-    # ── Stage 6: Demo Guide ───────────────────────────────────────────────
-    _header("Stage 6 — Demo Guide")
+    # ── Stage 4: Guide ───────────────────────────────────────────────────
+    _header("Stage 4 — Guide")
     t = time.time()
-    guide = run_demo_guide(classifier, demo, live_url=live_url)
-    results["stage_6_demo_guide"] = guide
+    guide = run_guide(understand, demo, live_url=live_url)
+    results["stage_4_guide"] = guide
     _ok("Completed", _elapsed(t))
     print()
     for line in guide.splitlines():
@@ -549,7 +498,7 @@ def main():
     print()
 
     # ── Registry update ───────────────────────────────────────────────────
-    new_id = append_to_registry(matcher, classifier, deploy_url=live_url or None)
+    new_id = append_to_registry(design, understand, deploy_url=live_url or None)
     if new_id:
         _ok("Registry updated", new_id)
     else:

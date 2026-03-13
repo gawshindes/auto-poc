@@ -35,8 +35,7 @@ except ImportError:
     pass
 
 from pipeline import (
-    run_classifier, run_dependency_checker, run_knowledge_resolver,
-    run_solutions_matcher, run_sdr_messenger, run_demo_builder, run_demo_guide,
+    run_understand, run_design, run_build, run_guide,
     append_to_registry, read_transcript,
 )
 from storage import get_backend
@@ -78,13 +77,11 @@ def _new_session(transcript: str, mode: str = "auto", email: str = "") -> dict:
         "current_stage": 0,
         "transcript": transcript,
         "email": email or None,
-        "stage_1_classifier": None,
-        "stage_2_dependency": None,
-        "stage_3_matcher": None,
-        "stage_4_messenger": None,
-        "stage_5_demo": None,
+        "stage_1_understand": None,
+        "stage_2_design": None,
+        "stage_3_demo": None,
         "deploy_url": None,
-        "stage_6_guide": None,
+        "stage_4_guide": None,
         "logs": [],
         "error": None,
         "created_at": datetime.now().isoformat(),
@@ -113,7 +110,7 @@ def _log(session: dict, message: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline runner (background thread)
+# Pipeline runner (background thread) — 4-stage pipeline
 # ---------------------------------------------------------------------------
 
 def _run_pipeline_thread(session: dict) -> None:
@@ -136,144 +133,96 @@ def _run_pipeline_thread(session: dict) -> None:
         session["status"] = "running"
         _save_session(session)
 
-        # Stage 1 — Classifier
+        # Stage 1 — Understand
         session["current_stage"] = 1
-        _log(session, "Stage 1 — Classifier started")
+        _log(session, "Stage 1 — Understand started")
         t = time.time()
-        classifier = run_classifier(session["transcript"])
-        session["stage_1_classifier"] = classifier
-        _log(session, f"Stage 1 — Classifier completed in {time.time()-t:.1f}s")
-        _push(sid, "stage_done", {"stage": 1, "result": classifier})
+        understand = run_understand(session["transcript"])
+        session["stage_1_understand"] = understand
+        _log(session, f"Stage 1 — Understand completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 1, "result": understand})
         _save_session(session)
 
-        if classifier.get("demo_decision") == "NO":
+        if understand.get("demo_decision") == "NO":
             session["status"] = "done"
-            session["error"] = f"No demo needed: {classifier.get('reason', '')}"
+            session["error"] = f"No demo needed: {understand.get('reason', '')}"
             _save_session(session)
             _push(sid, "done", {"message": session["error"]})
             return
 
-        pause_if_verbose("Stage 1 complete — Classifier", classifier)
+        pause_if_verbose("Stage 1 complete — Understand", understand)
 
-        # Stage 2 — Dependency Checker
+        # Stage 2 — Design
         session["current_stage"] = 2
-        _log(session, "Stage 2 — Dependency Checker started")
-        t = time.time()
-        dependency = run_dependency_checker(classifier)
-        # Override: any "needed before build" item blocks Stage 5
-        if any(
-            item.get("urgency", "").startswith("needed before build")
-            for item in dependency.get("ask_customer", [])
-        ):
-            dependency["can_build_immediately"] = False
-        session["stage_2_dependency"] = dependency
-        _log(session, f"Stage 2 — Dependency Checker completed in {time.time()-t:.1f}s")
-        _push(sid, "stage_done", {"stage": 2, "result": dependency})
-        _save_session(session)
 
-        pause_if_verbose("Stage 2 complete — Dependency Checker", dependency)
+        # Check if customer input needed BEFORE design
+        ask_items = understand.get("dependencies", {}).get("ask_customer", [])
+        customer_inputs = ""
 
-        # Stage 2b — Knowledge Resolver (auto-fill ask_customer items from general knowledge)
-        resolver = {}
-        if dependency.get("ask_customer"):
-            _log(session, "Stage 2b — Knowledge Resolver started")
-            t = time.time()
-            resolver = run_knowledge_resolver(classifier, dependency)
-            session["stage_2b_resolver"] = resolver
-            resolved_count = len(resolver.get("resolved", []))
-            still_need = resolver.get("still_need_from_customer", [])
-            _log(session, f"Stage 2b — Knowledge Resolver completed in {time.time()-t:.1f}s"
-                          f" ({resolved_count} items self-served, {len(still_need)} still need customer)")
-            _push(sid, "stage_done", {"stage": "2b", "result": resolver})
+        # Determine if we need customer input
+        needs_input = ask_items and not understand.get("can_build_immediately")
+
+        if ask_items:
+            _log(session, f"Customer input items identified: {len(ask_items)}")
+
+        # Collect customer inputs if needed (always stop for this, even in auto mode)
+        if needs_input:
+            session["status"] = "waiting_input"
             _save_session(session)
-            # Patch dependency output: replace ask_customer with only truly needed items
-            dependency["ask_customer"] = still_need
-            if resolver.get("can_build_immediately"):
-                dependency["can_build_immediately"] = True
-            dependency["resolved_by_knowledge"] = resolver.get("resolved", [])
+            _push(sid, "waiting", {"reason": "input", "items": ask_items})
+            _pause_events[sid].wait()
+            _pause_events[sid].clear()
+            customer_inputs = _input_values.pop(sid, "")
+            session["status"] = "running"
 
-        # Stage 3 — Solutions Matcher
-        session["current_stage"] = 3
-        _log(session, "Stage 3 — Solutions Matcher started")
+        # Append additional context provided at pipeline start
+        additional_context = session.get("additional_context") or ""
+        if additional_context:
+            customer_inputs = (customer_inputs + "\n\n[Additional context from operator]:\n" + additional_context).strip() if customer_inputs else f"[Additional context from operator]:\n{additional_context}"
+
+        # Merge resolved knowledge into customer inputs
+        resolved = understand.get("dependencies", {}).get("resolved_by_knowledge", [])
+        if resolved:
+            resolved_text = "\n\n".join(
+                f"[Auto-resolved] {r['dependency']}:\n{r['answer']}"
+                for r in resolved
+            )
+            customer_inputs = (resolved_text + "\n\n" + customer_inputs).strip() if customer_inputs else resolved_text
+
+        _log(session, "Stage 2 — Design started")
         t = time.time()
-        matcher = run_solutions_matcher(classifier, dependency)
-        session["stage_3_matcher"] = matcher
-        _log(session, f"Stage 3 — Solutions Matcher completed in {time.time()-t:.1f}s")
-        _push(sid, "stage_done", {"stage": 3, "result": matcher})
+        design = run_design(understand, customer_inputs)
+        session["stage_2_design"] = design
+        _log(session, f"Stage 2 — Design completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 2, "result": design})
         _save_session(session)
 
-        # Skip Stage 5 if ALL components already exist in registry (Python decides, not LLM)
-        _component_matches = matcher.get("component_matches", [])
-        if _component_matches and all(
-            m.get("action", "build_new").startswith("exists")
-            for m in _component_matches
-        ):
-            existing_urls = [m["demo_url"] for m in _component_matches if m.get("demo_url")]
-            sdr_note = matcher.get("build_instruction", {}).get("sdr_note", "")
+        # Skip build if ALL components exist (deterministic Python check)
+        matches = design.get("component_matches", [])
+        if matches and all(m.get("action", "build_new").startswith("exists") for m in matches):
+            existing_urls = [m["demo_url"] for m in matches if m.get("demo_url")]
+            sdr_note = design.get("build_instruction", {}).get("sdr_note", "")
             msg = sdr_note or "All required components already exist in solutions library."
-            _log(session, "Stage 5 skipped — all components exist in library.")
+            _log(session, "Build skipped — all components exist in library.")
             session["status"] = "done"
             session["deploy_url"] = existing_urls[0] if existing_urls else None
             _save_session(session)
             _push(sid, "done", {"deploy_url": existing_urls[0] if existing_urls else "", "guide": msg})
             return
 
-        pause_if_verbose("Stage 3 complete — Solutions Matcher", matcher)
+        pause_if_verbose("Stage 2 complete — Design", design)
 
-        # Stage 4 — SDR Messenger (only if customer input needed)
-        session["current_stage"] = 4
-        messenger_output = ""
-        ask_items = dependency.get("ask_customer", [])
-        if ask_items:
-            _log(session, "Stage 4 — SDR Messenger started")
-            t = time.time()
-            messenger_output = run_sdr_messenger(classifier, dependency, matcher)
-            session["stage_4_messenger"] = messenger_output
-            _log(session, f"Stage 4 — SDR Messenger completed in {time.time()-t:.1f}s")
-            _push(sid, "stage_done", {"stage": 4, "result": messenger_output})
-            _save_session(session)
-        else:
-            _log(session, "Stage 4 — SDR Messenger skipped (no customer input needed)")
-            _push(sid, "stage_done", {"stage": 4, "result": None, "skipped": True})
-
-        # Collect customer inputs if needed (always stop for this, even in auto mode)
-        customer_inputs = ""
-        if ask_items and not dependency.get("can_build_immediately"):
-            session["status"] = "waiting_input"
-            _save_session(session)
-            _push(sid, "waiting", {"reason": "input", "items": ask_items})
-            # Block until /input endpoint provides values
-            _pause_events[sid].wait()
-            _pause_events[sid].clear()
-            customer_inputs = _input_values.pop(sid, "")
-            session["status"] = "running"
-        elif verbose:
-            pause_if_verbose("Stage 4 complete — SDR Messenger", messenger_output or None)
-
-        # Stage 5 — Demo Builder
-        session["current_stage"] = 5
-        _log(session, "Stage 5 — Demo Builder started (this takes 30–60s)")
+        # Stage 3 — Build
+        session["current_stage"] = 3
+        _log(session, "Stage 3 — Build started (this takes 30-60s)")
         t = time.time()
-        # Merge resolver answers into customer_inputs so builder has the domain knowledge
-        resolved_answers = resolver.get("resolved", [])
-        if resolved_answers:
-            resolved_text = "\n\n".join(
-                f"[Auto-resolved] {r['dependency']}:\n{r['answer']}"
-                for r in resolved_answers
-            )
-            customer_inputs = (resolved_text + "\n\n" + customer_inputs).strip() if customer_inputs else resolved_text
-        # Append additional context provided at pipeline start
-        additional_context = session.get("additional_context") or ""
-        if additional_context:
-            customer_inputs = (customer_inputs + "\n\n[Additional context from operator]:\n" + additional_context).strip() if customer_inputs else f"[Additional context from operator]:\n{additional_context}"
-        demo = run_demo_builder(classifier, dependency, matcher,
-                                customer_inputs=customer_inputs)
-        session["stage_5_demo"] = demo
-        _log(session, f"Stage 5 — Demo Builder completed in {time.time()-t:.1f}s")
-        _push(sid, "stage_done", {"stage": 5, "result": "Demo code generated"})
+        demo = run_build(design, customer_inputs)
+        session["stage_3_demo"] = demo
+        _log(session, f"Stage 3 — Build completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 3, "result": "Demo code generated"})
         _save_session(session)
 
-        pause_if_verbose("Stage 5 complete — Demo built", {"lines": len(demo.splitlines())})
+        pause_if_verbose("Stage 3 complete — Demo built", {"lines": len(demo.splitlines())})
 
         # Deploy
         live_url = ""
@@ -281,44 +230,42 @@ def _run_pipeline_thread(session: dict) -> None:
             from deploy import deploy_demo, parse_demo_files, validate_demo_files, ValidationError
             _log(session, "Validating demo files...")
             files = parse_demo_files(demo)
-            # stdlib-only demos (e.g. http.server) legitimately have no dependencies —
-            # inject an empty requirements.txt so the validator and Railway don't reject them
             if "requirements.txt" not in files and "main.py" in files:
                 files["requirements.txt"] = ""
             file_summary = ", ".join(f"{k}({len(v)}B)" for k, v in files.items())
             _log(session, f"Parsed files: {file_summary}")
             validate_demo_files(files)
             slug = re.sub(r"[^a-z0-9-]", "-",
-                          classifier.get("customer", {}).get("company", "demo").lower())
+                          understand.get("customer", {}).get("company", "demo").lower())
             _log(session, f"Deploying to Railway (slug: {slug})...")
             t = time.time()
-            live_url = deploy_demo(demo, slug, classifier=classifier)
+            live_url = deploy_demo(demo, slug, classifier=understand)
             session["deploy_url"] = live_url
             _log(session, f"Deployed in {time.time()-t:.1f}s — {live_url}")
             _push(sid, "log", {"message": f"Deployed: {live_url}"})
             _save_session(session)
         except Exception as deploy_err:
             _log(session, f"Deploy skipped or failed: {deploy_err}")
-            _push(sid, "log", {"message": f"⚠ Deploy error: {deploy_err}"})
+            _push(sid, "log", {"message": f"Deploy error: {deploy_err}"})
 
-        # Stage 6 — Demo Guide
-        session["current_stage"] = 6
-        _log(session, "Stage 6 — Demo Guide started")
+        # Stage 4 — Guide
+        session["current_stage"] = 4
+        _log(session, "Stage 4 — Guide started")
         t = time.time()
-        guide = run_demo_guide(classifier, demo, live_url=live_url)
-        session["stage_6_guide"] = guide
-        _log(session, f"Stage 6 — Demo Guide completed in {time.time()-t:.1f}s")
-        _push(sid, "stage_done", {"stage": 6, "result": guide})
+        guide = run_guide(understand, demo, live_url=live_url)
+        session["stage_4_guide"] = guide
+        _log(session, f"Stage 4 — Guide completed in {time.time()-t:.1f}s")
+        _push(sid, "stage_done", {"stage": 4, "result": guide})
         _save_session(session)
 
         # Registry
-        new_id = append_to_registry(matcher, classifier, deploy_url=live_url or None)
+        new_id = append_to_registry(design, understand, deploy_url=live_url or None)
         if new_id:
             _log(session, f"Registry updated: {new_id}")
 
         # Email (auto mode only, if email provided)
         if mode == "auto" and session.get("email"):
-            _send_email(session["email"], classifier, live_url, guide)
+            _send_email(session["email"], understand, live_url, guide)
             _log(session, f"Email sent to {session['email']}")
 
         session["status"] = "done"
@@ -336,14 +283,14 @@ def _run_pipeline_thread(session: dict) -> None:
             asyncio.run_coroutine_threadsafe(_queues[sid].put(None), _loop)
 
 
-def _send_email(email: str, classifier: dict, deploy_url: str, guide: str) -> None:
+def _send_email(email: str, understand: dict, deploy_url: str, guide: str) -> None:
     resend_key = os.environ.get("RESEND_API_KEY", "")
     if not resend_key:
         return
     try:
         import resend
         resend.api_key = resend_key
-        company = classifier.get("customer", {}).get("company", "your customer")
+        company = understand.get("customer", {}).get("company", "your customer")
         resend.Emails.send({
             "from": "demos@resend.dev",
             "to": [email],
@@ -425,7 +372,7 @@ async def stream(session_id: str):
         session = _load_session(session_id)
         if session["status"] == "done":
             async def done_stream():
-                yield f"event: done\ndata: {json.dumps({'deploy_url': session.get('deploy_url',''), 'guide': session.get('stage_6_guide','')})}\n\n"
+                yield f"event: done\ndata: {json.dumps({'deploy_url': session.get('deploy_url',''), 'guide': session.get('stage_4_guide','')})}\n\n"
             return StreamingResponse(done_stream(), media_type="text/event-stream")
         # Create a new queue for re-connection; existing thread (if alive) won't use it
         _queues[session_id] = asyncio.Queue()
@@ -476,14 +423,14 @@ async def list_sessions():
 @app.post("/redeploy/{session_id}")
 async def redeploy(session_id: str):
     session = _load_session(session_id)
-    demo = session.get("stage_5_demo")
-    classifier = session.get("stage_1_classifier") or {}
+    demo = session.get("stage_3_demo")
+    understand = session.get("stage_1_understand") or {}
     if not demo:
         raise HTTPException(status_code=400, detail="No demo code found in session. Run the full pipeline first.")
     try:
         from deploy import deploy_demo
-        slug = re.sub(r"[^a-z0-9-]", "-", classifier.get("customer", {}).get("company", "demo").lower())
-        live_url = deploy_demo(demo, slug, classifier=classifier)
+        slug = re.sub(r"[^a-z0-9-]", "-", understand.get("customer", {}).get("company", "demo").lower())
+        live_url = deploy_demo(demo, slug, classifier=understand)
         session["deploy_url"] = live_url
         _save_session(session)
         return JSONResponse({"deploy_url": live_url})
@@ -495,14 +442,14 @@ async def redeploy(session_id: str):
 async def get_session(session_id: str):
     session = _load_session(session_id)
     # Don't send full transcript/demo in status check — too large
-    summary = {k: v for k, v in session.items() if k not in ("transcript", "stage_5_demo")}
+    summary = {k: v for k, v in session.items() if k not in ("transcript", "stage_3_demo")}
     return JSONResponse(summary)
 
 
 @app.get("/session/{session_id}/demo")
 async def get_session_demo(session_id: str):
     session = _load_session(session_id)
-    demo = session.get("stage_5_demo") or ""
+    demo = session.get("stage_3_demo") or ""
     return JSONResponse({
         "session_id": session_id,
         "demo_length": len(demo),
@@ -593,7 +540,6 @@ async def bulk_replace_solutions(body: dict):
     solutions = body.get("solutions")
     if not isinstance(solutions, list):
         raise HTTPException(status_code=422, detail="Body must have a 'solutions' array")
-    # Ensure each entry has an id
     for i, s in enumerate(solutions):
         if not s.get("id"):
             s["id"] = f"sol_{i + 1:03d}"
@@ -641,51 +587,25 @@ def _require_admin(request: Request) -> None:
 
 @app.delete("/admin/sessions")
 async def delete_sessions(request: Request, keep_last: int = 0):
-    """
-    Delete all sessions from the volume.
-
-    Query params:
-      keep_last=N  — keep the N most recently updated sessions (default 0 = delete all)
-
-    curl example:
-      curl -X DELETE "https://your-app.railway.app/admin/sessions" \\
-           -H "Authorization: Bearer $ADMIN_TOKEN"
-
-      curl -X DELETE "https://your-app.railway.app/admin/sessions?keep_last=5" \\
-           -H "Authorization: Bearer $ADMIN_TOKEN"
-    """
     _require_admin(request)
-
     sessions_dir = _backend._sessions_dir
     if not sessions_dir.exists():
         return JSONResponse({"ok": True, "deleted": 0, "kept": 0})
-
     all_files = sorted(sessions_dir.glob("*.json"), key=lambda p: p.stat().st_mtime)
-
     if keep_last > 0:
         to_delete = all_files[:-keep_last] if len(all_files) > keep_last else []
         kept = len(all_files) - len(to_delete)
     else:
         to_delete = all_files
         kept = 0
-
     for f in to_delete:
         f.unlink()
-
     return JSONResponse({"ok": True, "deleted": len(to_delete), "kept": kept})
 
 
 @app.delete("/admin/sessions/{session_id}")
 async def delete_session(session_id: str, request: Request):
-    """
-    Delete a single session by ID.
-
-    curl example:
-      curl -X DELETE "https://your-app.railway.app/admin/sessions/abc12345" \\
-           -H "Authorization: Bearer $ADMIN_TOKEN"
-    """
     _require_admin(request)
-
     session_file = _backend._sessions_dir / f"{session_id}.json"
     if not session_file.exists():
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")

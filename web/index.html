@@ -513,12 +513,10 @@
 
 <script>
 const STAGES = [
-  { id: 1, name: "Stage 1 — Classifier" },
-  { id: 2, name: "Stage 2 — Dependency Checker" },
-  { id: 3, name: "Stage 3 — Solutions Matcher" },
-  { id: 4, name: "Stage 4 — SDR Messenger" },
-  { id: 5, name: "Stage 5 — Demo Builder" },
-  { id: 6, name: "Stage 6 — Demo Guide" },
+  { id: 1, name: "Stage 1 — Understand" },
+  { id: 2, name: "Stage 2 — Design" },
+  { id: 3, name: "Stage 3 — Build" },
+  { id: 4, name: "Stage 4 — Guide" },
 ];
 
 let sessionId = null;
@@ -750,7 +748,7 @@ function connectSSE() {
     document.getElementById("continue-panel")?.remove();
 
     // Reveal and mark next stage as running
-    if (id < 6 && !data.skipped) {
+    if (id < 4 && !data.skipped) {
       const nextEl = document.getElementById(`stage-${id + 1}`);
       if (nextEl) nextEl.style.display = "";
       setStageState(id + 1, "running");
@@ -1091,7 +1089,7 @@ async function restoreSession(sid) {
       session.mode === "verbose" ? "Verbose mode" : "Auto mode";
 
     // Restore completed stages (unhide each before setting state)
-    const stageKeys = ["stage_1_classifier","stage_2_dependency","stage_3_matcher","stage_4_messenger","stage_5_demo","stage_6_guide"];
+    const stageKeys = ["stage_1_understand","stage_2_design","stage_3_demo","stage_4_guide"];
     stageKeys.forEach((key, i) => {
       const id = i + 1;
       const result = session[key];
@@ -1099,22 +1097,23 @@ async function restoreSession(sid) {
         const el = document.getElementById(`stage-${id}`);
         if (el) el.style.display = "";
         setStageState(id, "done");
-        setStageOutput(id, id === 5 ? "(demo code — see output file)" : result);
+        setStageOutput(id, id === 3 ? "(demo code — see output file)" : result);
       }
     });
 
     if (session.status === "done") {
-      showDonePanel({ deploy_url: session.deploy_url, guide: session.stage_6_guide });
+      showDonePanel({ deploy_url: session.deploy_url, guide: session.stage_4_guide });
     } else if (session.status === "running" || session.status === "waiting_continue" || session.status === "waiting_input") {
       connectSSE();
       if (session.status === "waiting_input") {
-        const dep = session.stage_2_dependency;
-        if (dep && dep.ask_customer) showInputPanel(dep.ask_customer);
+        const understand = session.stage_1_understand;
+        const askItems = understand && understand.dependencies && understand.dependencies.ask_customer;
+        if (askItems) showInputPanel(askItems);
       }
     }
 
-    if (session.stage_1_classifier) {
-      const c = session.stage_1_classifier.customer || {};
+    if (session.stage_1_understand) {
+      const c = session.stage_1_understand.customer || {};
       document.getElementById("pipeline-company").textContent =
         `${c.name || ""} @ ${c.company || ""}`.trim();
     }
