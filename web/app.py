@@ -429,8 +429,14 @@ async def redeploy(session_id: str):
         raise HTTPException(status_code=400, detail="No demo code found in session. Run the full pipeline first.")
     try:
         from deploy import deploy_demo
-        slug = re.sub(r"[^a-z0-9-]", "-", understand.get("customer", {}).get("company", "demo").lower())
+        # Railway project names have a 32 character limit. "demo-" is 5 chars.
+        # We limit the slug to 25 chars and strip leading/trailing hyphens.
+        raw_slug = understand.get("customer", {}).get("company", "demo").lower()
+        slug = re.sub(r"[^a-z0-9-]", "-", raw_slug)
+        slug = re.sub(r"-+", "-", slug).strip("-")[:25].strip("-")
+        
         live_url = deploy_demo(demo, slug, classifier=understand)
+
         session["deploy_url"] = live_url
         _save_session(session)
         return JSONResponse({"deploy_url": live_url})
