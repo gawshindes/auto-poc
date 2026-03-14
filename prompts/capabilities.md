@@ -26,14 +26,14 @@ Never ask the customer for access to these. Always simulate with realistic fake 
 
 | System | Keywords | Mock Strategy | Example Data |
 |--------|----------|---------------|--------------|
-| Salesforce CRM | salesforce, sfdc, crm | Dummy JSON store with realistic SFDC field structure: Id, Name, Amount, StageName, CloseDate, AccountId, OwnerId | 10-20 realistic deal records in the customer's industry |
+| Salesforce CRM | salesforce, sfdc, crm | Dummy JSON store with realistic SFDC field structure: Id, Name, Amount, StageName, CloseDate, AccountId, OwnerId | 3-5 realistic deal records in the customer's industry |
 | HubSpot CRM | hubspot, hub spot | JSON file mimicking HubSpot contact/deal structure with realistic pipeline stages | Mix of leads, prospects, and closed deals |
 | Pipedrive | pipedrive | JSON with deal stages, contact info, activity history | Realistic sales pipeline for their industry |
-| SAP / ERP systems | sap, erp, oracle, netsuite | SQLite DB or JSON with inventory/order/financial data structure | 20-50 records with realistic industry data |
+| SAP / ERP systems | sap, erp, oracle, netsuite | SQLite DB or JSON with inventory/order/financial data structure | 3-5 records with realistic industry data |
 | Internal databases | our database, internal system, our backend, proprietary | SQLite with schema inferred from the workflow described in transcript | Realistic records using customer's actual industry terminology |
 | Payment processors | stripe, payment, billing, invoice | Simulate payment responses with hardcoded mock transactions | Mix of successful, pending, and failed transactions |
 | Enterprise OAuth / SSO | oauth, sso, active directory, okta, saml | Hardcode a demo user session — skip auth entirely in demo | Single pre-authenticated demo user |
-| Slack / Teams workspace data | slack workspace, teams channels, internal messages | Mock message feed with realistic team communication samples | 5-10 realistic messages/threads relevant to the use case |
+| Slack / Teams workspace data | slack workspace, teams channels, internal messages | Mock message feed with realistic team communication samples | 3-5 realistic messages/threads relevant to the use case |
 | Google Workspace (Drive, Sheets, Docs) | google drive, google sheets, google docs, gsuite | Use CSV/JSON files locally mimicking the spreadsheet or doc structure | Sample data relevant to their workflow |
 
 ## Things to Ask the Customer
@@ -44,7 +44,7 @@ Only ask for things the customer can provide in under an hour with zero IT invol
 |------|----------|-------------|------------|
 | Public URL | ebay store, website url, public profile, linkedin, amazon store | 5 minutes | Share the direct link to [X] so we pull from the right place |
 | Simple API key | squarespace, notion, airtable, webflow, shopify | 10-15 minutes | Grab your API key from [Settings > Advanced > API Keys] and paste it here |
-| Sample data file | csv, spreadsheet, export, data file | 10 minutes | Export a sample of [X] as a CSV — even 20-30 rows is perfect |
+| Sample data file | csv, spreadsheet, export, data file | 10 minutes | Export a sample of [X] as a CSV — even 3-5 rows is perfect |
 | Brand assets | logo, brand colors, company colors | 5 minutes | Send your logo file and brand colors — we'll make the demo feel like yours |
 | Workflow confirmation | markup, percentage, pricing, threshold, rule | 2 minutes | Just confirming — [specific parameter] so we set this up the way you want |
 

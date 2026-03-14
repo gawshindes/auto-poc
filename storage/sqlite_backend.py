@@ -174,7 +174,7 @@ class SqliteBackend(StorageBackend):
         for r in rows:
             d = dict(r)
             stage_outputs = json.loads(d.pop("stage_outputs") or "{}")
-            classifier = stage_outputs.get("stage_1_classifier") or {}
+            classifier = stage_outputs.get("stage_1_understand") or stage_outputs.get("stage_1_classifier") or {}
             sessions.append({
                 "session_id": d["session_id"],
                 "company": (

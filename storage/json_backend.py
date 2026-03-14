@@ -57,7 +57,7 @@ class JsonFileBackend(StorageBackend):
         for f in self._sessions_dir.glob("*.json"):
             try:
                 s = json.loads(f.read_text())
-                classifier = s.get("stage_1_classifier") or {}
+                classifier = s.get("stage_1_understand") or {}
                 sessions.append({
                     "session_id": s["session_id"],
                     "company": (

@@ -1,6 +1,8 @@
 """
 Shared pipeline module — used by CLI (test_pipeline.py), Slack bot (bot.py), and web UI (web/app.py).
 
+4-stage pipeline: Understand → Design → Build → Guide
+
 All run_* functions use module-level singletons for the Anthropic client, prompts, and registries
 so they can be imported and called directly without any setup boilerplate.
 """
@@ -39,15 +41,11 @@ def _load_registry(filename: str, default: dict | None = None) -> dict:
 
 
 PROMPTS = {
-    "classifier":         _load_prompt("01_classifier.md"),
-    "dependency":         _load_prompt("02_dependency_checker.md"),
-    "knowledge_resolver": _load_prompt("02b_knowledge_resolver.md"),
-    "capabilities":       _load_prompt("capabilities.md"),
-    "matcher":            _load_prompt("03_solutions_matcher.md"),
-    "messenger":          _load_prompt("04_sdr_messenger.md"),
-    "builder":            _load_prompt("05_demo_builder.md"),
-    "ui_design_system":   _load_prompt("ui_design_system.md"),
-    "guide":              _load_prompt("06_demo_guide.md"),
+    "understand":       _load_prompt("01_understand.md"),
+    "design":           _load_prompt("02_design.md"),
+    "builder":          _load_prompt("03_build.md"),
+    "guide":            _load_prompt("04_guide.md"),
+    "capabilities":     _load_prompt("capabilities.md"),
 }
 
 TEAM = _load_registry("team.json", default={"team": []})
@@ -81,10 +79,11 @@ def _get_backend():
 def run_stage(system_prompt: str, user_content: str, max_tokens: int = 2000,
               strip_fences: bool = True) -> str:
     response = get_client().messages.create(
-        model="claude-sonnet-4-20250514",
+        model=os.environ.get("BUILDER_ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=max_tokens,
         system=system_prompt,
         messages=[{"role": "user", "content": user_content}],
+        extra_headers={"anthropic-beta": "max-tokens-3-5-sonnet-2024-07-15"}
     )
     text = response.content[0].text.strip()
     if strip_fences and "```" in text:
@@ -104,89 +103,52 @@ def _parse_json(raw: str, stage_name: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline stages
+# Pipeline stages (4-stage: Understand → Design → Build → Guide)
 # ---------------------------------------------------------------------------
 
-def run_classifier(transcript: str) -> dict:
+def run_understand(transcript: str) -> dict:
+    """Stage 1: Classify + dependencies + knowledge resolution in one call."""
     content = (
         f"Internal team members (anyone else is the customer):\n"
         f"{json.dumps(TEAM['team'], indent=2)}\n\n"
+        f"Agency capabilities:\n{PROMPTS['capabilities']}\n\n"
         f"Analyze this transcript:\n\n{transcript}"
     )
-    return _parse_json(run_stage(PROMPTS["classifier"], content), "Classifier")
+    return _parse_json(run_stage(PROMPTS["understand"], content, max_tokens=4000), "Understand")
 
 
-def run_dependency_checker(classifier_output: dict) -> dict:
+def run_design(understand_output: dict, customer_inputs: str = "") -> dict:
+    """Stage 2: Solutions match + SDR message + demo blueprint."""
+    solutions = json.dumps(_get_backend().get_solutions(), indent=2)
     content = (
-        f"Demo spec:\n{json.dumps(classifier_output, indent=2)}\n\n"
-        f"Capabilities registry:\n{PROMPTS['capabilities']}"
+        f"Stage 1 (Understand) output:\n{json.dumps(understand_output, indent=2)}\n\n"
+        f"Solutions registry:\n{solutions}\n\n"
+        f"Customer-provided inputs:\n{customer_inputs or 'None'}"
     )
-    return _parse_json(run_stage(PROMPTS["dependency"], content), "Dependency Checker")
+    return _parse_json(run_stage(PROMPTS["design"], content, max_tokens=6000), "Design")
 
 
-def run_solutions_matcher(classifier_output: dict, dependency_output: dict) -> dict:
-    solutions = _get_backend().get_solutions()
+def run_build(design_output: dict, customer_inputs: str = "") -> str:
+    """Stage 3: Implement the spec from Design stage."""
+    demo_spec = design_output.get("demo_spec", {})
+    component_matches = design_output.get("component_matches", [])
     content = (
-        f"Classifier output:\n{json.dumps(classifier_output, indent=2)}\n\n"
-        f"Dependency output:\n{json.dumps(dependency_output, indent=2)}\n\n"
-        f"Solutions registry:\n{json.dumps(solutions, indent=2)}"
-    )
-    return _parse_json(run_stage(PROMPTS["matcher"], content), "Solutions Matcher")
-
-
-def run_knowledge_resolver(classifier_output: dict, dependency_output: dict) -> dict:
-    """
-    Try to self-serve ask_customer items from general/industry knowledge.
-    Returns a resolver dict with 'resolved', 'still_need_from_customer', 'can_build_immediately'.
-    If ask_customer is empty, returns a no-op result immediately without an API call.
-    """
-    ask_items = dependency_output.get("ask_customer", [])
-    if not ask_items:
-        return {
-            "resolved": [],
-            "still_need_from_customer": [],
-            "can_build_immediately": True,
-        }
-    content = (
-        f"Classifier output:\n{json.dumps(classifier_output, indent=2)}\n\n"
-        f"Dependency Checker ask_customer items:\n{json.dumps(ask_items, indent=2)}"
-    )
-    return _parse_json(
-        run_stage(PROMPTS["knowledge_resolver"], content, max_tokens=2000),
-        "Knowledge Resolver",
-    )
-
-
-def run_sdr_messenger(classifier_output: dict, dependency_output: dict,
-                      matcher_output: dict) -> str:
-    content = (
-        f"Classifier:\n{json.dumps(classifier_output, indent=2)}\n"
-        f"Dependency:\n{json.dumps(dependency_output, indent=2)}\n"
-        f"Matcher:\n{json.dumps(matcher_output, indent=2)}"
-    )
-    return run_stage(PROMPTS["messenger"], content, max_tokens=1500)
-
-
-def run_demo_builder(classifier_output: dict, dependency_output: dict,
-                     matcher_output: dict, customer_inputs: str = "") -> str:
-    content = (
-        f"Classifier spec:\n{json.dumps(classifier_output, indent=2)}\n"
-        f"Dependency spec:\n{json.dumps(dependency_output, indent=2)}\n"
-        f"Solutions matcher:\n{json.dumps(matcher_output, indent=2)}\n"
-        f"Customer-provided inputs:\n{customer_inputs or 'None — build with mocks only'}\n\n"
-        f"UI Design System (apply to all HTML/CSS):\n{PROMPTS['ui_design_system']}"
+        f"Demo spec:\n{json.dumps(demo_spec, indent=2)}\n\n"
+        f"Component matches:\n{json.dumps(component_matches, indent=2)}\n\n"
+        f"Customer-provided inputs:\n{customer_inputs or 'None'}"
     )
     return run_stage(PROMPTS["builder"], content, max_tokens=16000, strip_fences=False)
 
 
-def run_demo_guide(classifier_output: dict, demo_output: str, live_url: str = "") -> str:
+def run_guide(understand_output: dict, demo_output: str, live_url: str = "") -> str:
+    """Stage 4: Demo guide for the founder."""
     file_list = re.findall(
         r'\*\*([^\n*`#]{1,80})\*\*|\n#{1,3}\s+([^\n*`#]{1,80})\n|```[^\n]*\n#\s*([a-zA-Z0-9_./-]{1,80})\n',
         demo_output,
     )
     filenames = [next(f for f in match if f) for match in file_list if any(f for f in match)]
     content = (
-        f"Classifier:\n{json.dumps(classifier_output, indent=2)}\n\n"
+        f"Understanding:\n{json.dumps(understand_output, indent=2)}\n\n"
         f"Demo app files: {', '.join(filenames) if filenames else 'see demo output'}\n\n"
         f"Live URL: {live_url or 'not yet deployed'}"
     )
@@ -197,16 +159,16 @@ def run_demo_guide(classifier_output: dict, demo_output: str, live_url: str = ""
 # Registry helpers
 # ---------------------------------------------------------------------------
 
-def append_to_registry(matcher_output: dict, classifier_output: dict,
+def append_to_registry(design_output: dict, understand_output: dict,
                        deploy_url: str | None = None) -> str | None:
     """
     Append a newly built solution to the solutions registry.
     Returns the new solution ID, or None if skipped.
     """
-    if not matcher_output.get("add_to_registry_after_build", False):
+    if not design_output.get("add_to_registry_after_build", False):
         return None
 
-    suggested = matcher_output.get("suggested_registry_entry", {})
+    suggested = design_output.get("suggested_registry_entry", {})
     if not suggested or not suggested.get("name"):
         return None
 
@@ -226,13 +188,13 @@ def append_to_registry(matcher_output: dict, classifier_output: dict,
     )
     new_id = f"sol_{max_num + 1:03d}"
 
-    customer = classifier_output.get("customer", {})
+    customer = understand_output.get("customer", {})
     entry = {
         "id": new_id,
         "name": name,
         "description": suggested.get("description", ""),
         "built_for": customer.get("company", ""),
-        "demo_type": suggested.get("demo_type") or classifier_output.get("demo_type", "custom"),
+        "demo_type": suggested.get("demo_type") or understand_output.get("demo_type", "custom"),
         "stack": suggested.get("stack", ""),
         "source": "demo_tool",
         "status": "built",

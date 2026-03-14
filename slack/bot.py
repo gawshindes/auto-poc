@@ -12,8 +12,7 @@ from deploy import deploy_demo
 # Import shared pipeline module
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from pipeline import (
-    run_classifier, run_dependency_checker, run_solutions_matcher,
-    run_sdr_messenger, run_demo_builder, run_demo_guide,
+    run_understand, run_design, run_build, run_guide,
     append_to_registry,
 )
 from storage import get_backend
@@ -31,15 +30,15 @@ def _load_state(channel_id: str) -> dict | None:
     return _backend.get_slack_state(channel_id)
 
 
-def format_slack_blocks(classifier, dependency, matcher, messenger_output):
-    customer = classifier.get("customer", {})
-    demo_type = classifier.get("demo_type", "unknown")
-    wow = classifier.get("wow_moment", "")
-    match_type = matcher.get("match_result", {}).get("type", "none")
-    matched = matcher.get("match_result", {}).get("matched_solution", "")
-    effort = matcher.get("build_instruction", {}).get("estimated_effort", "unknown")
-    can_build = dependency.get("can_build_immediately", False)
-    gaps = matcher.get("discovery_gaps", [])
+def format_slack_blocks(understand, design):
+    customer = understand.get("customer", {})
+    demo_type = understand.get("demo_type", "unknown")
+    wow = understand.get("wow_moment", "")
+    match_type = design.get("match_result", {}).get("type", "none") if "match_result" in design else "none"
+    matched = design.get("match_result", {}).get("matched_solution", "") if "match_result" in design else ""
+    effort = design.get("build_instruction", {}).get("estimated_effort", "unknown")
+    can_build = understand.get("can_build_immediately", False)
+    gaps = design.get("discovery_gaps", [])
 
     match_emoji = {"full": "♻️ Full match", "partial": "🔧 Partial match", "none": "🆕 Build new"}.get(match_type, "❓")
 
@@ -70,12 +69,13 @@ def format_slack_blocks(classifier, dependency, matcher, messenger_output):
             "text": {"type": "mrkdwn", "text": f"*🔍 Discovery Gaps (ask in demo meeting):*\n{gap_text}"}
         })
 
-    if not can_build:
+    sdr_msg = design.get("sdr_message", {})
+    if sdr_msg.get("needed"):
         blocks.append({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": f"*📧 SDR Action Required:*\n{messenger_output}"}
+            "text": {"type": "mrkdwn", "text": f"*📧 SDR Action Required:*\n{sdr_msg.get('email_draft', '')}"}
         })
-    else:
+    elif can_build:
         blocks.append({
             "type": "section",
             "text": {"type": "mrkdwn", "text": "✅ *No customer input needed — ready to build*"}
@@ -86,61 +86,62 @@ def format_slack_blocks(classifier, dependency, matcher, messenger_output):
 
 def _run_pipeline(transcript, channel_id, user_id, say):
     try:
-        classifier = run_classifier(transcript)
+        # Stage 1 — Understand
+        understand = run_understand(transcript)
 
-        if classifier.get("demo_decision") == "NO":
-            say(f"❌ *No demo needed.*\nReason: {classifier.get('reason', 'Insufficient signal.')}")
+        if understand.get("demo_decision") == "NO":
+            say(f"❌ *No demo needed.*\nReason: {understand.get('reason', 'Insufficient signal.')}")
             return
 
-        dependency = run_dependency_checker(classifier)
+        # Merge resolved knowledge into customer inputs
+        customer_inputs = ""
+        resolved = understand.get("dependencies", {}).get("resolved_by_knowledge", [])
+        if resolved:
+            customer_inputs = "\n\n".join(
+                f"[Auto-resolved] {r['dependency']}:\n{r['answer']}"
+                for r in resolved
+            )
 
-        if any(
-            item.get("urgency", "").startswith("needed before build")
-            for item in dependency.get("ask_customer", [])
-        ):
-            dependency["can_build_immediately"] = False
+        # Stage 2 — Design
+        design = run_design(understand, customer_inputs)
 
-        matcher = run_solutions_matcher(classifier, dependency)
-
-        # Skip builder if ALL components already exist in registry (Python decides, not LLM)
-        _component_matches = matcher.get("component_matches", [])
-        if _component_matches and all(
+        # Skip build if ALL components already exist in registry
+        matches = design.get("component_matches", [])
+        if matches and all(
             m.get("action", "build_new").startswith("exists")
-            for m in _component_matches
+            for m in matches
         ):
-            existing_urls = [m["demo_url"] for m in _component_matches if m.get("demo_url")]
-            sdr_note = matcher.get("build_instruction", {}).get("sdr_note", "")
+            existing_urls = [m["demo_url"] for m in matches if m.get("demo_url")]
+            sdr_note = design.get("build_instruction", {}).get("sdr_note", "")
             msg = sdr_note or "All required components already exist in solutions library."
             url_line = f"\nExisting demo: {existing_urls[0]}" if existing_urls else ""
             say(f"*All components exist — no new build needed.*\n{msg}{url_line}")
             return
 
-        messenger_output = ""
-        if dependency.get("ask_customer"):
-            messenger_output = run_sdr_messenger(classifier, dependency, matcher)
-
-        blocks = format_slack_blocks(classifier, dependency, matcher, messenger_output)
+        blocks = format_slack_blocks(understand, design)
         app.client.chat_postMessage(channel=channel_id, blocks=blocks)
 
-        if dependency.get("can_build_immediately"):
+        can_build = understand.get("can_build_immediately", False)
+        ask_items = understand.get("dependencies", {}).get("ask_customer", [])
+
+        if can_build or not ask_items:
             say("🔨 Building demo now...")
-            demo = run_demo_builder(classifier, dependency, matcher)
+            demo = run_build(design, customer_inputs)
             say("🎉 *Demo built! Pushing to GitHub and deploying to Railway...*")
             slug = re.sub(r"[^a-z0-9-]", "-",
-                          classifier.get("customer", {}).get("company", "demo").lower())
+                          understand.get("customer", {}).get("company", "demo").lower())
             try:
-                live_url = deploy_demo(demo, slug, classifier=classifier)
+                live_url = deploy_demo(demo, slug, classifier=understand)
                 say(f"🚀 *Live at:* {live_url}")
-                append_to_registry(matcher, classifier, deploy_url=live_url)
-                guide = run_demo_guide(classifier, demo, live_url=live_url)
+                append_to_registry(design, understand, deploy_url=live_url)
+                guide = run_guide(understand, demo, live_url=live_url)
                 say(f"📋 *Demo Guide:*\n```{guide}```")
             except Exception as deploy_err:
                 say(f"⚠️ Deploy failed: `{str(deploy_err)}`\n\nDemo code:\n\n{demo}")
         else:
             _save_state(channel_id, {
-                "classifier": classifier,
-                "dependency": dependency,
-                "matcher": matcher,
+                "understand": understand,
+                "design": design,
             })
             say("⏳ *Waiting for customer inputs before building.*\n"
                 "Once the customer replies, paste their answer with `/demo-continue [customer reply]`.")
@@ -159,7 +160,7 @@ def handle_demo(ack, say, body, command):
 
     user_id = body["user_id"]
     channel = body["channel_id"]
-    say(f"<@{user_id}> 🔍 Analyzing transcript across 3 stages... (~45 seconds)")
+    say(f"<@{user_id}> 🔍 Analyzing transcript... (~45 seconds)")
     _run_pipeline(transcript, channel, user_id, say)
 
 
@@ -206,20 +207,19 @@ def handle_demo_continue(ack, say, body, command):
         say("❌ No pending demo found for this channel. Run `/demo [transcript]` first.")
         return
 
-    classifier = state["classifier"]
-    dependency = state["dependency"]
-    matcher = state["matcher"]
+    understand = state["understand"]
+    design = state["design"]
 
     say(f"✅ Got it — building with customer inputs:\n```{customer_inputs}```")
     try:
-        demo = run_demo_builder(classifier, dependency, matcher, customer_inputs=customer_inputs)
+        demo = run_build(design, customer_inputs=customer_inputs)
         say("🎉 *Demo built! Pushing to GitHub and deploying to Railway...*")
         slug = re.sub(r"[^a-z0-9-]", "-",
-                      classifier.get("customer", {}).get("company", "demo").lower())
-        live_url = deploy_demo(demo, slug, classifier=classifier)
+                      understand.get("customer", {}).get("company", "demo").lower())
+        live_url = deploy_demo(demo, slug, classifier=understand)
         say(f"🚀 *Live at:* {live_url}")
-        append_to_registry(matcher, classifier, deploy_url=live_url)
-        guide = run_demo_guide(classifier, demo, live_url=live_url)
+        append_to_registry(design, understand, deploy_url=live_url)
+        guide = run_guide(understand, demo, live_url=live_url)
         say(f"📋 *Demo Guide:*\n```{guide}```")
     except Exception as e:
         say(f"⚠️ Build/deploy failed: `{str(e)}`")
