@@ -17,6 +17,65 @@ _BANNED_PACKAGES = ["playwright", "greenlet", "openai"]  # openai: no OPENAI_API
 _BANNED_PYDANTIC = re.compile(r"pydantic\s*[=<>!]=?\s*2\.[0-6]\b|pydantic\s*[=<>!]=?\s*1\.")
 
 
+def _fix_truncated_json(broken_json: str) -> str:
+    """Attempts to intelligently close truncated JSON strings and objects."""
+    s = broken_json.strip()
+    
+    # 1. Close unescaped strings
+    unmasked = s.replace('\\"', '')
+    if unmasked.count('"') % 2 != 0:
+        s += '"'
+        
+    s = s.strip()
+    
+    # 2. Cleanup trailing commas/colons
+    if s.endswith(','):
+        s = s[:-1].strip()
+    elif s.endswith(':'):
+        s += ' null'
+        
+    # 3. Handle uncompleted dictionary properties (e.g., `"recent_`)
+    try:
+        json.loads(s + '}')
+    except json.JSONDecodeError as e:
+        if "Expecting ':' delimiter" in str(e):
+            s += ': null'
+
+    # 4. Use LIFO stack to find necessary closing braces/brackets
+    stack = []
+    in_string = False
+    escape = False
+    for char in s:
+        if escape:
+            escape = False
+            continue
+        if char == '\\':
+            escape = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+            
+        if not in_string:
+            if char in '{[':
+                stack.append(char)
+            elif char == '}':
+                if stack and stack[-1] == '{':
+                    stack.pop()
+            elif char == ']':
+                if stack and stack[-1] == '[':
+                    stack.pop()
+                    
+    closing_suffix = ""
+    for char in reversed(stack):
+        if char == '{':
+            closing_suffix += '}'
+        elif char == '[':
+            closing_suffix += ']'
+            
+    return s + closing_suffix
+
+
 def validate_demo_files(files: dict) -> list:
     """
     Pre-deploy sanity checks on parsed demo files.
@@ -76,30 +135,13 @@ def validate_demo_files(files: dict) -> list:
                 json.loads(fcontent)
             except json.JSONDecodeError as base_e:
                 # LLM output truncated? Attempt simple fix
-                fixed = fcontent.strip()
-                if fixed.count('"') % 2 != 0:
-                    fixed += '"'
-                    
-                open_braces = fixed.count('{')
-                close_braces = fixed.count('}')
-                open_brackets = fixed.count('[')
-                close_brackets = fixed.count(']')
-                
-                # Rough fix: append closing brackets/braces based on count difference
-                # Order matters slightly, but typically LLMs end inside a string, then value, then obj/array
-                while open_brackets > close_brackets or open_braces > close_braces:
-                    if open_braces > close_braces:
-                        fixed += '}'
-                        close_braces += 1
-                    else:
-                        fixed += ']'
-                        close_brackets += 1
                 try:
+                    fixed = _fix_truncated_json(fcontent)
                     json.loads(fixed)
                     files[fname] = fixed  # Save the fixed version
                     warnings.append(f"Auto-fixed malformed JSON in {fname}")
-                except json.JSONDecodeError:
-                    raise ValidationError(f"Malformed JSON in {fname}: {base_e} (auto-fix failed)")
+                except Exception as final_e:
+                    raise ValidationError(f"Malformed JSON in {fname}: {base_e} (auto-fix failed: {final_e})")
 
     return warnings
 
@@ -339,14 +381,21 @@ def create_railway_project(slug: str, github_repo: str) -> tuple:
 # ---------------------------------------------------------------------------
 
 def inject_railway_variables(project_id: str, environment_id: str, service_id: str) -> None:
-    """Push the Anthropic API key to the newly created Railway service."""
+    """Push the API keys to the newly created Railway service."""
     variables = {}
     
-    # Pass along any AI API keys present in the local environment
-    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
-        val = os.environ.get(key)
-        if val:
-            variables[key] = val
+    # Use dedicated DEMO key if available, otherwise fallback to the builder key
+    demo_anthropic_key = os.environ.get("DEMO_ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+    if demo_anthropic_key:
+        variables["ANTHROPIC_API_KEY"] = demo_anthropic_key
+        
+    # Inject the specific model to use for the deployed demo (default to cheaper Haiku)
+    variables["ANTHROPIC_MODEL"] = os.environ.get("DEMO_ANTHROPIC_MODEL", "claude-3-haiku-20240307")
+        
+    # Pass along OpenAI key if present
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key:
+        variables["OPENAI_API_KEY"] = openai_key
             
     if not variables:
         return
@@ -433,52 +482,6 @@ def wait_for_deploy(project_id: str, service_id: str, timeout: int = 300) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Registry writer
-# ---------------------------------------------------------------------------
-
-def register_deployment(slug: str, live_url: str, classifier: dict) -> None:
-    """
-    Append a new demo_tool entry to the solutions registry after a successful deploy.
-
-    Args:
-        slug:       URL-safe customer slug, e.g. "renocomputerfix"
-        live_url:   Railway URL, e.g. "https://demo-renocomputerfix.up.railway.app"
-        classifier: Output dict from run_classifier() — used for metadata
-    """
-    from storage import get_backend
-    backend = get_backend()
-    registry = backend.get_solutions()
-
-    # Auto-increment ID
-    existing_ids = [s['id'] for s in registry['solutions']]
-    next_num = max((int(i.split('_')[1]) for i in existing_ids), default=0) + 1
-    new_id = f"sol_{next_num:03d}"
-
-    customer = classifier.get('customer', {})
-    company = customer.get('company', slug)
-    demo_type = classifier.get('demo_type', 'custom')
-    core_problem = classifier.get('core_problem', '')
-    proposed_solution = classifier.get('proposed_solution', '')
-
-    new_entry = {
-        'id': new_id,
-        'name': f"{company} — {demo_type.replace('_', ' ').title()} Demo",
-        'description': proposed_solution or core_problem or f"Demo built for {company}",
-        'built_for': company,
-        'demo_type': demo_type,
-        'what_to_customize': classifier.get('constraints', []),
-        'reuse_effort': 'low',
-        'hosting': 'Railway',
-        'stack': 'Auto-deployed via demo_tool',
-        'source': 'demo_tool',
-        'status': 'built',
-        'demo_url': live_url,
-    }
-
-    backend.append_solution(new_entry, registry)
-
-
-# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -525,8 +528,5 @@ def deploy_demo(demo_output: str, slug: str, classifier: dict = None) -> str:
 
     # Step 5 — wait for live
     wait_for_deploy(project_id, service_id)
-
-    # Step 6 — write to solutions registry
-    register_deployment(slug, live_url, classifier or {})
 
     return live_url

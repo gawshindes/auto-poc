@@ -46,7 +46,6 @@ PROMPTS = {
     "builder":          _load_prompt("03_build.md"),
     "guide":            _load_prompt("04_guide.md"),
     "capabilities":     _load_prompt("capabilities.md"),
-    "ui_design_system": _load_prompt("ui_design_system.md"),
 }
 
 TEAM = _load_registry("team.json", default={"team": []})
@@ -80,10 +79,11 @@ def _get_backend():
 def run_stage(system_prompt: str, user_content: str, max_tokens: int = 2000,
               strip_fences: bool = True) -> str:
     response = get_client().messages.create(
-        model="claude-sonnet-4-20250514",
+        model=os.environ.get("BUILDER_ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=max_tokens,
         system=system_prompt,
         messages=[{"role": "user", "content": user_content}],
+        extra_headers={"anthropic-beta": "max-tokens-3-5-sonnet-2024-07-15"}
     )
     text = response.content[0].text.strip()
     if strip_fences and "```" in text:
@@ -135,8 +135,7 @@ def run_build(design_output: dict, customer_inputs: str = "") -> str:
     content = (
         f"Demo spec:\n{json.dumps(demo_spec, indent=2)}\n\n"
         f"Component matches:\n{json.dumps(component_matches, indent=2)}\n\n"
-        f"Customer-provided inputs:\n{customer_inputs or 'None'}\n\n"
-        f"UI Design System:\n{PROMPTS['ui_design_system']}"
+        f"Customer-provided inputs:\n{customer_inputs or 'None'}"
     )
     return run_stage(PROMPTS["builder"], content, max_tokens=16000, strip_fences=False)
 
