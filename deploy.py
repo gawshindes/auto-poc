@@ -118,18 +118,30 @@ def validate_demo_files(files: dict) -> list:
             + "\n".join(f"  • {p}" for p in bad_pkgs)
         )
 
-    # 3. $PORT usage (soft warning)
+    # 3. python-multipart required if form/file upload is used
     main_content = files["main.py"]
+    form_indicators = ("UploadFile", "Form(", "File(")
+    if any(ind in main_content for ind in form_indicators):
+        req_lower = req_content.lower()
+        if "python-multipart" not in req_lower:
+            errors.append(
+                "main.py uses form data (UploadFile/Form/File) but requirements.txt "
+                "is missing python-multipart — Railway deploy will crash"
+            )
+    if errors:
+        raise ValidationError("Pre-deploy check failed:\n" + "\n".join(f"  • {e}" for e in errors))
+
+    # 4. $PORT usage (soft warning)
     if "PORT" not in main_content:
         warnings.append("main.py does not reference $PORT — app may not bind correctly on Railway")
 
-    # 4. Python syntax check (in-memory, works anywhere)
+    # 5. Python syntax check (in-memory, works anywhere)
     try:
         compile(main_content, "main.py", "exec")
     except SyntaxError as e:
         raise ValidationError(f"Syntax error in main.py: {e}")
 
-    # 5. JSON syntax check for data files (malformed JSON crashes app at startup)
+    # 6. JSON syntax check for data files (malformed JSON crashes app at startup)
     for fname, fcontent in files.items():
         if fname.endswith(".json") and fcontent.strip():
             try:

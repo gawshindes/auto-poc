@@ -11,7 +11,19 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from pipeline import run_understand, run_design
 from deploy import parse_demo_files
 
-transcript = "We are an IT firm. We want a simple web page with a 'Contact Us' form. When a user submits the form, grab their name and email, and send a Slack message to our #inbound channel to notify the team."
+transcript = """
+Founder: Hey, thanks for jumping on a call. So we've got a prospect — TechFlow IT Solutions. They're an IT services company, about 30 employees.
+
+SDR: Cool, what are they looking for?
+
+Founder: They want a simple web page with a 'Contact Us' form. When someone submits the form with their name, email, and a message, they want a Slack notification sent to their #inbound channel so the team knows immediately. They said they're losing leads because nobody checks the contact form inbox.
+
+SDR: Makes sense. So it's a lead capture form that pings Slack in real-time?
+
+Founder: Exactly. Nothing fancy — just a clean form, maybe use AI to categorize the inquiry type (sales, support, partnership), and fire off a Slack message with all the details. They want to demo it to their ops manager next week.
+
+SDR: Got it. We can definitely build that. The Slack integration is straightforward since we have that skill already.
+"""
 
 print("Running Understand...")
 u = run_understand(transcript)
