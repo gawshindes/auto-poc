@@ -108,6 +108,7 @@ Always include fallback mock data for external sources. The demo should NEVER cr
    ```
    fastapi>=0.110.0
    uvicorn>=0.27.0
+   python-multipart>=0.0.9
    anthropic>=0.30.0
    requests>=2.31.0
    ```

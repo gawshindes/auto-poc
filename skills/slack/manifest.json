@@ -1,0 +1,6 @@
+{
+  "name": "slack",
+  "description": "Send notifications and messages to a Slack channel using a Slack App bot.",
+  "tokens": ["SLACK_BOT_TOKEN"],
+  "packages": ["slack_sdk"]
+}

@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 # Resolve project root (web/app.py → parent is project root)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "slack"))  # for deploy.py
+
 
 # Load .env file for local development (no-op if already set or file missing)
 try:
@@ -239,7 +239,7 @@ def _run_pipeline_thread(session: dict) -> None:
                           understand.get("customer", {}).get("company", "demo").lower())
             _log(session, f"Deploying to Railway (slug: {slug})...")
             t = time.time()
-            live_url = deploy_demo(demo, slug, classifier=understand)
+            live_url = deploy_demo(demo, slug, classifier=understand, design_spec=session.get("stage_2_design"))
             session["deploy_url"] = live_url
             _log(session, f"Deployed in {time.time()-t:.1f}s — {live_url}")
             _push(sid, "log", {"message": f"Deployed: {live_url}"})

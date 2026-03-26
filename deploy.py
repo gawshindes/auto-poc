@@ -3,7 +3,11 @@ import re
 import json
 import time
 import requests
+<<<<<<< HEAD:slack/deploy.py
 import ast
+=======
+from pathlib import Path
+>>>>>>> main:deploy.py
 
 GITHUB_API = "https://api.github.com"
 RAILWAY_API = "https://backboard.railway.app/graphql/v2"
@@ -118,12 +122,24 @@ def validate_demo_files(files: dict) -> list:
             + "\n".join(f"  • {p}" for p in bad_pkgs)
         )
 
-    # 3. $PORT usage (soft warning)
+    # 3. python-multipart required if form/file upload is used
     main_content = files["main.py"]
+    form_indicators = ("UploadFile", "Form(", "File(")
+    if any(ind in main_content for ind in form_indicators):
+        req_lower = req_content.lower()
+        if "python-multipart" not in req_lower:
+            errors.append(
+                "main.py uses form data (UploadFile/Form/File) but requirements.txt "
+                "is missing python-multipart — Railway deploy will crash"
+            )
+    if errors:
+        raise ValidationError("Pre-deploy check failed:\n" + "\n".join(f"  • {e}" for e in errors))
+
+    # 4. $PORT usage (soft warning)
     if "PORT" not in main_content:
         warnings.append("main.py does not reference $PORT — app may not bind correctly on Railway")
 
-    # 4. Python syntax check and AST validation (in-memory, works anywhere)
+    # 5. Python syntax check and AST validation (in-memory, works anywhere)
     try:
         tree = ast.parse(main_content, filename="main.py")
         for node in ast.walk(tree):
@@ -143,7 +159,7 @@ def validate_demo_files(files: dict) -> list:
     except SyntaxError as e:
         raise ValidationError(f"Syntax error in main.py: {e}")
 
-    # 5. JSON syntax check for data files (malformed JSON crashes app at startup)
+    # 6. JSON syntax check for data files (malformed JSON crashes app at startup)
     for fname, fcontent in files.items():
         if fname.endswith(".json") and fcontent.strip():
             try:
@@ -395,7 +411,7 @@ def create_railway_project(slug: str, github_repo: str) -> tuple:
 # Step 3.5: Railway — inject environment variables
 # ---------------------------------------------------------------------------
 
-def inject_railway_variables(project_id: str, environment_id: str, service_id: str) -> None:
+def inject_railway_variables(project_id: str, environment_id: str, service_id: str, extra_tokens: set = None) -> None:
     """Push the API keys to the newly created Railway service."""
     variables = {}
     
@@ -412,6 +428,23 @@ def inject_railway_variables(project_id: str, environment_id: str, service_id: s
     if openai_key:
         variables["OPENAI_API_KEY"] = openai_key
             
+    # Load demo.env if it exists and fetch requested skill tokens
+    if extra_tokens:
+        demo_env_path = Path(__file__).parent / "demo.env"
+        demo_env_vars = {}
+        if demo_env_path.exists():
+            try:
+                from dotenv import dotenv_values
+                demo_env_vars = dotenv_values(demo_env_path)
+            except ImportError:
+                pass
+        
+        for t in extra_tokens:
+            if t in demo_env_vars:
+                variables[t] = demo_env_vars[t]
+            elif t in os.environ:
+                variables[t] = os.environ[t]
+
     if not variables:
         return
         
@@ -500,7 +533,7 @@ def wait_for_deploy(project_id: str, service_id: str, timeout: int = 300) -> Non
 # Orchestrator
 # ---------------------------------------------------------------------------
 
-def deploy_demo(demo_output: str, slug: str, classifier: dict = None) -> str:
+def deploy_demo(demo_output: str, slug: str, classifier: dict = None, design_spec: dict = None) -> str:
     """
     Full deploy pipeline:
       1. Parse demo builder output → files
@@ -533,6 +566,35 @@ def deploy_demo(demo_output: str, slug: str, classifier: dict = None) -> str:
     for w in warnings:
         print(f"  ⚠ {w}")
 
+    # Inject skills into files
+    required_skills = []
+    tokens_to_inject = set()
+    if design_spec:
+        required_skills = design_spec.get("demo_spec", {}).get("required_skills", [])
+    
+    for skill in required_skills:
+        skill_dir = Path(__file__).parent / "skills" / skill
+        if not skill_dir.exists():
+            continue
+            
+        adapter_path = skill_dir / "adapter.py"
+        manifest_path = skill_dir / "manifest.json"
+        
+        if adapter_path.exists():
+            files[f"skills/{skill}.py"] = adapter_path.read_text()
+            files["skills/__init__.py"] = ""
+            
+        if manifest_path.exists():
+            try:
+                manifest = json.loads(manifest_path.read_text())
+                packages = manifest.get("packages", [])
+                if packages and "requirements.txt" in files:
+                    files["requirements.txt"] += "\n" + "\n".join(packages)
+                for t in manifest.get("tokens", []):
+                    tokens_to_inject.add(t)
+            except Exception:
+                pass
+
     # Step 1–2 — GitHub
     full_name, _ = create_github_repo(slug)
     push_files_to_github(full_name, files)
@@ -541,7 +603,7 @@ def deploy_demo(demo_output: str, slug: str, classifier: dict = None) -> str:
     project_id, environment_id, service_id = create_railway_project(slug, full_name)
 
     # Step 3.5 — Inject environment variables (API Keys)
-    inject_railway_variables(project_id, environment_id, service_id)
+    inject_railway_variables(project_id, environment_id, service_id, extra_tokens=tokens_to_inject)
 
     # Step 4 — trigger deploy + provision domain in parallel order
     trigger_railway_deploy(service_id, environment_id)
