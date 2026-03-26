@@ -3,6 +3,7 @@ import re
 import json
 import time
 import requests
+import ast
 
 GITHUB_API = "https://api.github.com"
 RAILWAY_API = "https://backboard.railway.app/graphql/v2"
@@ -122,9 +123,23 @@ def validate_demo_files(files: dict) -> list:
     if "PORT" not in main_content:
         warnings.append("main.py does not reference $PORT — app may not bind correctly on Railway")
 
-    # 4. Python syntax check (in-memory, works anywhere)
+    # 4. Python syntax check and AST validation (in-memory, works anywhere)
     try:
-        compile(main_content, "main.py", "exec")
+        tree = ast.parse(main_content, filename="main.py")
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                is_template_call = False
+                if isinstance(node.func, ast.Attribute) and node.func.attr == "TemplateResponse":
+                    is_template_call = True
+                elif isinstance(node.func, ast.Name) and node.func.id == "TemplateResponse":
+                    is_template_call = True
+                
+                if is_template_call and node.args:
+                    first_arg = node.args[0]
+                    # If first arg is a string literal (e.g. "index.html"), it's using the old deprecated syntax
+                    is_str_literal = (isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str)) or type(first_arg).__name__ == "Str"
+                    if is_str_literal:
+                        raise ValidationError("TemplateResponse called with template name as first positional argument. Starlette 0.28+ requires `request` as the first argument. LLM must use `TemplateResponse(request=request, name='...', context={...})`")
     except SyntaxError as e:
         raise ValidationError(f"Syntax error in main.py: {e}")
 
