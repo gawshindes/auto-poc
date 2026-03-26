@@ -117,12 +117,31 @@ def run_understand(transcript: str) -> dict:
     return _parse_json(run_stage(PROMPTS["understand"], content, max_tokens=4000), "Understand")
 
 
+def get_available_skills() -> list[dict]:
+    """Scan the skills directory and return a list of parsed manifest.json dictionaries."""
+    skills = []
+    skills_dir = PROJECT_ROOT / "skills"
+    if not skills_dir.exists():
+        return skills
+    for entry in skills_dir.iterdir():
+        if entry.is_dir():
+            manifest_path = entry / "manifest.json"
+            if manifest_path.exists():
+                try:
+                    skills.append(json.loads(manifest_path.read_text()))
+                except json.JSONDecodeError:
+                    pass
+    return skills
+
+
 def run_design(understand_output: dict, customer_inputs: str = "") -> dict:
     """Stage 2: Solutions match + SDR message + demo blueprint."""
     solutions = json.dumps(_get_backend().get_solutions(), indent=2)
+    available_skills = json.dumps(get_available_skills(), indent=2)
     content = (
         f"Stage 1 (Understand) output:\n{json.dumps(understand_output, indent=2)}\n\n"
         f"Solutions registry:\n{solutions}\n\n"
+        f"Available API Skills:\n{available_skills}\n\n"
         f"Customer-provided inputs:\n{customer_inputs or 'None'}"
     )
     return _parse_json(run_stage(PROMPTS["design"], content, max_tokens=6000), "Design")
@@ -132,9 +151,20 @@ def run_build(design_output: dict, customer_inputs: str = "") -> str:
     """Stage 3: Implement the spec from Design stage."""
     demo_spec = design_output.get("demo_spec", {})
     component_matches = design_output.get("component_matches", [])
+    
+    required_skills = demo_spec.get("required_skills", [])
+    skill_adapters = ""
+    if required_skills:
+        for skill_name in required_skills:
+            adapter_path = PROJECT_ROOT / "skills" / skill_name / "adapter.py"
+            if adapter_path.exists():
+                adapter_code = adapter_path.read_text()
+                skill_adapters += f"\n--- {skill_name} adapter ---\n{adapter_code}\n"
+    
     content = (
         f"Demo spec:\n{json.dumps(demo_spec, indent=2)}\n\n"
         f"Component matches:\n{json.dumps(component_matches, indent=2)}\n\n"
+        f"Requested Skill Adapters (Do NOT redefine these, just import them from skills.{skill_name}):\n{skill_adapters or 'None'}\n\n"
         f"Customer-provided inputs:\n{customer_inputs or 'None'}"
     )
     return run_stage(PROMPTS["builder"], content, max_tokens=16000, strip_fences=False)

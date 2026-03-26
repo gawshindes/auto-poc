@@ -117,6 +117,12 @@ For each file, specify:
 - Combine real data with AI processing
 - Both the real data AND the AI output must work
 
+### Integration Skills
+The input context contains an `Available API Skills` list (e.g., Slack, Gmail). 
+If the customer needs integration with one of those services, do NOT plan to mock it.
+Add its name to the `required_skills` array in `demo_spec`. 
+The builder agent will automatically receive the pre-written adapter Python code for any required skills, so you do not need to explain how they work.
+
 ### Interactive Requirement
 
 Every demo MUST have at least ONE user action that triggers a visible, dynamic change.
@@ -229,9 +235,10 @@ Every demo MUST have at least ONE user action that triggers a visible, dynamic c
       "what_is_real": ["Claude API — always real", "Any public data sources"],
       "data_files": ["data/fallback.json"]
     },
+    "required_skills": ["slack", "gmail"],
     "integrations": [
       {
-        "name": "slack | gmail | calendar | crm",
+        "name": "calendar | crm",
         "purpose": "Why this integration enhances the demo",
         "status": "available | mock",
         "config_needed": ["ENV_VAR_NAME"]
@@ -314,6 +321,7 @@ Input: Demo spec for a company wanting voice agent + profile matching + SEO tool
       "what_is_real": ["Claude API matching logic"],
       "data_files": ["data/students.json", "data/opportunities.json"]
     },
+    "required_skills": [],
     "integrations": []
   }
 }

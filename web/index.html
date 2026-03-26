@@ -550,7 +550,7 @@ async function loadRecentSessions() {
         waiting_continue:"badge-waiting", waiting_input:"badge-waiting", idle:"badge-idle"}[s.status] || "badge-idle";
       const label = {running:"● running", done:"✓ done", error:"✗ error",
         waiting_continue:"⏸ waiting", waiting_input:"⏸ needs input", idle:"idle"}[s.status] || s.status;
-      const stage = s.current_stage > 0 ? `Stage ${s.current_stage}/6` : "Not started";
+      const stage = s.current_stage > 0 ? `Stage ${s.current_stage}/4` : "Not started";
       const ago = s.updated_at ? timeAgo(s.updated_at) : "";
       return `<div class="session-row" onclick="window.location='?session=${s.session_id}'">
         <span class="session-company">${escapeHtml(s.company || "Unknown")}</span>

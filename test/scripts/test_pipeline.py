@@ -144,7 +144,7 @@ def main():
     # ── Redeploy shortcut — no Claude calls ───────────────────────────────
     if args.redeploy:
         import re as _re
-        sys.path.insert(0, str(PROJECT_ROOT / "slack"))
+        sys.path.insert(0, str(PROJECT_ROOT))
         from deploy import deploy_demo
 
         redeploy_path = args.redeploy
@@ -248,7 +248,7 @@ def main():
             print(f"  {DIM}... ({len(lines) - 60} more lines — see {out_path}){RESET}")
 
         # Validate before deploying
-        sys.path.insert(0, str(PROJECT_ROOT / "slack"))
+        sys.path.insert(0, str(PROJECT_ROOT))
         from deploy import parse_demo_files, validate_demo_files, ValidationError
         _header("Pre-deploy Validation")
         _files = parse_demo_files(demo)
@@ -451,7 +451,7 @@ def main():
 
     # ── Pre-deploy validation ─────────────────────────────────────────────
     _header("Pre-deploy Validation")
-    sys.path.insert(0, str(PROJECT_ROOT / "slack"))
+    sys.path.insert(0, str(PROJECT_ROOT))
     from deploy import parse_demo_files, validate_demo_files, ValidationError
     _files = parse_demo_files(demo)
     _ok("Files parsed", ", ".join(_files.keys()))
