@@ -13,18 +13,13 @@ __pycache__/
 # Claude Code
 .claude/
 
-# Solutions registry — contains customer info, managed on Railway volume
-registry/solutions.json
+# Runtime database
+data.db
+data.db-wal
+data.db-shm
 
 # Runtime state & outputs
-sessions/
-web/sessions/
 test/data/outputs/
-slack/state/
 
 # Client transcripts (real PDFs contain customer data — keep only sample .txt files)
 test/data/transcripts/*.pdf
-
-
-# SQLite backend (opt-in via STORAGE_BACKEND=sqlite)
-data.db

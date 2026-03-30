@@ -8,6 +8,19 @@ This guide explains how to use the web version of the demo creation tool end-to-
 
 Open the tool in your browser (use the Railway URL shared with your team). No login is required — it's an internal tool.
 
+### Running Locally
+
+```bash
+git clone <repo>
+cd demo-creation-agent
+cp .env.example .env              # Add at least ANTHROPIC_API_KEY
+cp registry/team.example.json registry/team.json  # Add your team names
+pip install -r requirements.txt
+uvicorn web.app:app --reload --port 8000
+```
+
+Then open [http://localhost:8000](http://localhost:8000) in your browser.
+
 ---
 
 ## Step 1 — Prepare Your Transcript
@@ -30,7 +43,7 @@ The tool accepts the following file formats:
 
 ## Step 2 — Upload the Transcript
 
-1. On the home screen, drag your transcript file onto the upload zone, or click anywhere in the zone to browse your files.
+1. On the **Create Demo** tab, drag your transcript file onto the upload zone, or click anywhere in the zone to browse your files.
 2. The file name appears in the bar below the drop zone once selected.
 3. Changed your mind? Click **Change file** to swap it before starting.
 
@@ -42,14 +55,15 @@ After uploading, you'll choose how the pipeline runs:
 
 ### Auto *(Recommended)*
 
-All 6 stages run automatically without you having to click anything. The pipeline only pauses if it needs specific customer inputs (e.g., API keys or credentials).
+All 4 stages run automatically without you having to click anything. The pipeline only pauses if it needs specific customer inputs (e.g., a customer's store URL or API key).
 
 - Enter your email (optional) to receive a notification with the demo link when it's done.
+- You can also add **Additional context** — notes about the customer, links, or instructions the pipeline should factor in.
 - Best for most use cases — just upload and come back to the result.
 
 ### Verbose (Step by Step)
 
-The pipeline pauses after each of the 6 stages and shows you the full output. You click **Continue** to advance to the next stage.
+The pipeline pauses after each stage and shows you the full output. You click **Continue** to advance to the next stage.
 
 - Useful when you want to inspect the AI's analysis before proceeding.
 
@@ -59,38 +73,79 @@ Click **Start Pipeline** once you've chosen a mode.
 
 ## What the Pipeline Does
 
-The pipeline runs 6 AI stages to go from transcript to deployed demo:
+The pipeline runs 4 AI stages to go from transcript to deployed demo:
 
 | Stage | Name | What it does |
 |-------|------|-------------|
-| 1 | **Classifier** | Reads the transcript, identifies the customer, company, core problem, and type of demo needed |
-| 2 | **Dependency Checker** | Lists credentials, API keys, or integrations needed to build the demo |
-| 3 | **Solutions Matcher** | Checks if we've already built something similar — reuses or adapts if matched |
-| 4 | **SDR Messenger** | Drafts a message you can send the customer to request any missing inputs |
-| 5 | **Demo Builder** | Writes the full demo application code (Python/Flask) |
-| 6 | **Demo Guide** | Writes a short usage guide for the deployed demo |
+| 1 | **Understand** | Reads the transcript, identifies the customer, classifies the demo type, resolves dependencies, checks for existing matching demos |
+| 2 | **Design** | Creates a full demo spec: features, stack, skills needed, component matches |
+| 3 | **Build + Deploy** | Writes complete demo code, verifies it, deploys to GitHub + Railway |
+| 4 | **Guide** | Writes a short usage guide and talking points for the demo meeting |
+
+### Solutions Matching (Stage 1)
+
+The Understand stage automatically checks if we've already built a similar demo. If a match is found:
+- The pipeline stops early — no need to build again
+- You see a **"Match Found"** panel with the existing demo's name, reasoning, and a link
+- Click **"View in Demo Library"** to see the matched demo's details
+
+This saves time and LLM calls when a customer's need overlaps with a previous demo.
 
 ---
 
 ## Providing Customer Inputs (When Prompted)
 
-If Stage 2 identifies required inputs (e.g., an API key, webhook URL, or credentials), the pipeline pauses and shows an input panel with fields to fill in.
+If Stage 1 identifies inputs that only the customer can provide (e.g., their eBay store URL, webhook endpoint), the pipeline pauses and shows an input panel.
 
-- **Required** fields (red tag) — must be filled to build a real, working demo.
-- **Optional** fields (gray tag) — the demo will use placeholder/mock data if left blank.
+- **Required** fields (red tag) — the demo needs the customer's specific data to work correctly.
+- **Optional** fields (gray tag) — the demo will use realistic mock data if left blank.
 
-You can leave all fields blank to build a demo with mock data and fill in real values later by editing the code (see below).
+The pipeline tries to self-resolve as much as possible. Generic knowledge (industry SOPs, standard procedures, sample scenarios) is generated automatically — you'll only be asked for things that are truly customer-specific.
+
+You can leave all fields blank to build a demo with mock data and fill in real values later by editing the code.
 
 ---
 
 ## Getting the Demo URL
 
-After Stage 6 completes, the pipeline shows a **"Pipeline complete"** panel with:
+After Stage 4 completes, the pipeline shows a **"Pipeline complete"** panel with:
 
-- **Live demo URL** — format: `https://demo-{clientname}.up.railway.app`
-- **Demo guide** — a short usage doc for the demo
+- **Live demo URL** — format: `https://demo-{clientname}-production.up.railway.app`
+- **Health check status** — whether the deployed app responded correctly
+- **Demo guide** — talking points and usage instructions
 
 This URL is shareable directly with the client.
+
+---
+
+## UI Tabs
+
+The tool has four tabs:
+
+### Create Demo
+Upload a transcript and run the pipeline. Shows real-time progress via SSE (Server-Sent Events).
+
+### Demo Library
+Browse all deployed demos. Each demo card shows:
+- Demo name, company, type
+- Deploy URL with verification status
+- Creation date
+
+Click any demo to see full details: transcript, demo metadata, deployment info, and a link to the originating session.
+
+**Delete a demo**: Open demo detail → click **Delete Demo** at the bottom. This soft-deletes it — the demo won't appear in the library or be matched to future sessions.
+
+### Sessions
+Browse all pipeline runs — active, waiting, done, or errored.
+
+**Filter bar**: Filter by status (All / Running / Waiting / Done / Error) and search by company name or session ID.
+
+**Session rows** show: status badge, company/demo name, stage progress, mode, time ago, and navigation chips (Open deployed demo, View demo in library).
+
+**Click a session** to expand and see: error messages, stage outputs (Understand, Design, Guide), logs, and action buttons (Open in Pipeline View, View Demo, Redeploy).
+
+### Team
+Manage internal team members. The Understand stage uses this list to distinguish your team from the customer in transcripts.
 
 ---
 
@@ -105,10 +160,10 @@ Every deployed demo automatically gets its own GitHub repository. To find it:
    `https://github.com/{ORG}/demo-{clientname}`
 
 3. The repo contains all the generated demo files:
-   - `main.py` — the Flask web app
+   - `main.py` — the FastAPI/Flask web app
    - `requirements.txt` — Python dependencies
    - `Procfile` — Railway start command
-   - Any HTML templates (`templates/`)
+   - Any HTML templates or static files
 
 ---
 
@@ -142,13 +197,15 @@ Railway detects the push and redeploys. Check the Railway dashboard under the `d
 
 ---
 
-## Viewing Previous Sessions
+## Redeploying a Demo
 
-The home page shows a **Recent Sessions** list with all previous pipeline runs. Click any session to view:
+If a deploy failed or you want to redeploy with the same code:
 
-- Stage outputs (classifier analysis, dependency list, matched solution, etc.)
-- The deployed demo URL
-- Current status (running, done, error, waiting)
+1. Go to the **Sessions** tab
+2. Find the session and expand it
+3. Click **Redeploy**
+
+You can also use the **Retry Deploy** button on the pipeline view if the initial deploy failed.
 
 ---
 
@@ -165,3 +222,6 @@ Make sure the PDF is text-based (not a scanned image). If in doubt, open the PDF
 
 **Want to change the demo after deployment?**
 Edit the GitHub repo (see above). Changes go live automatically via Railway.
+
+**Solutions match is wrong**
+If the tool matched an existing demo that isn't actually relevant, you can delete that demo from the Demo Library (open it → Delete Demo), then re-run the pipeline.

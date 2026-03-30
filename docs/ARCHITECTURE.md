@@ -12,60 +12,47 @@ An internal tool that takes a discovery call transcript and automatically produc
 | Interface | Entry point | Use case |
 |-----------|-------------|----------|
 | **Web UI** | `uvicorn web.app:app --port 8000` | Primary — upload transcript, run pipeline, view results |
-| **Slack bot** | `python slack/bot.py` | `/demo [transcript]` and `/demo-continue` commands |
 | **CLI** | `python test/scripts/test_pipeline.py transcript.txt` | Testing and batch processing |
 
 ---
 
-## Pipeline (6 Stages)
+## Pipeline (4 Stages)
 
 ```
 Upload transcript
        │
        ▼
-[1] CLASSIFIER (Claude)
-    → Is demo needed? What type? Extract raw spec.
-    → If demo_decision=NO: stop here, explain why
+[1] UNDERSTAND (Claude)
+    → Classify transcript: is demo needed? what type?
+    → Extract customer info, core problem, proposed solution
+    → Dependency resolution: what to provide / mock / ask customer
+    → Knowledge resolution: self-resolve what LLM can generate
+    → Solutions match: check existing demos for reuse
+    → If match found → stop here, present existing demo
+    → If demo_decision=NO → stop here, explain why
+       │
+       ├── ask_customer items (if any with urgency "needed before build")
+       │   → Pipeline pauses, UI shows input panel
+       │   → User provides customer inputs or leaves blank for mock data
        │
        ▼
-[2] DEPENDENCY CHECKER (Claude + capabilities.md)
-    → What APIs/hosting we provide
-    → What systems to mock (enterprise systems, CRMs, etc.)
-    → What to ask the customer (public URLs, API keys, sample data)
-    → can_build_immediately: true/false
+[2] DESIGN (Claude)
+    → Demo spec: name, description, features, stack, skills
+    → Component matches from solutions registry
+    → Blueprint for the builder
        │
        ▼
-[3] SOLUTIONS MATCHER (Claude + solutions registry)
-    → Check registry for existing demos to reuse
-    → Full match → customize, don't rebuild
-    → Partial match → use as starting point
-    → No match → build from scratch
+[3] BUILD (Claude) + VERIFY + DEPLOY
+    → Writes complete runnable code
+    → Static analysis + verification agent fixes issues
+    → deploy.py: GitHub repo + Railway deploy
+    → Health check verification
+    → Demo saved to DB only after successful deploy
        │
-       ├── ask_customer items ──────────────────┐
-       │                                        │
-       ▼                                        │
-[4] SDR MESSENGER (Claude)                      │
-    → Internal brief for SDR                    │
-    → Draft email to customer                   │
-    → Collect customer inputs                   │
-       │                                        │
-       └────────────────────────────┐           │
-                                    ▼           ▼
-                           [5] DEMO BUILDER (Claude)
-                               → Writes complete runnable code
-                               → Fallback mock data included
-                                    │
-                                    ▼
-                           [DEPLOY] deploy.py
-                               → Parse files from builder output
-                               → Create GitHub repo + push
-                               → Create Railway project + deploy
-                               → Append to solutions registry
-                                    │
-                                    ▼
-                           [6] DEMO GUIDE (Claude)
-                               → Talking points for founder
-                               → How to run/present the demo
+       ▼
+[4] GUIDE (Claude)
+    → Talking points for founder
+    → How to present the demo
 ```
 
 ---
@@ -75,37 +62,40 @@ Upload transcript
 ```
 demo-creation-agent/
 ├── pipeline.py                  Shared pipeline module — all run_* functions
+├── deploy.py                    GitHub + Railway deploy pipeline
 ├── Procfile                     Railway start command
 ├── requirements.txt             Python dependencies
 ├── .env.example                 Environment variable reference
 │
 ├── prompts/
-│   ├── 01_classifier.md         Stage 1 — is demo needed? what type?
-│   ├── 02_dependency_checker.md Stage 2 — what to provide/mock/ask
-│   ├── capabilities.md          Reference: APIs, mock strategies, customer ask patterns
-│   ├── 03_solutions_matcher.md  Stage 3 — reuse existing demos
-│   ├── 04_sdr_messenger.md      Stage 4 — customer email draft
-│   ├── 05_demo_builder.md       Stage 5 — write complete demo code
-│   └── 06_demo_guide.md         Stage 6 — demo talking points
+│   ├── 01_understand.md         Stage 1 — classify, dependencies, knowledge, solutions match
+│   ├── 02_design.md             Stage 2 — demo spec and blueprint
+│   ├── 03_build.md              Stage 3 — write complete demo code
+│   ├── 03b_verify.md            Stage 3b — fix issues found by static analysis
+│   ├── 04_guide.md              Stage 4 — demo talking points
+│   └── capabilities.md          Reference: APIs, mock strategies, customer ask patterns
 │
 ├── storage/
 │   ├── __init__.py              StorageBackend ABC + get_backend() factory
-│   ├── json_backend.py          JSON file backend (default, zero setup)
-│   └── sqlite_backend.py        SQLite backend (opt-in, concurrent access)
+│   ├── sqlite_backend.py        SQLite backend (default, local dev)
+│   ├── supabase_backend.py      Supabase/PostgreSQL backend (production)
+│   └── migrations/              SQL migration files (auto-applied for SQLite, manual for Supabase)
+│
+├── skills/                      Pluggable skill adapters (e.g., slack/)
+│   └── slack/
+│       ├── manifest.json        Skill metadata
+│       └── adapter.py           Skill implementation
 │
 ├── registry/
 │   ├── team.json                Internal team members (names only)
-│   ├── team.example.json        Template for new deployers
-│   ├── solutions.json           Library of all demos ever built (grows automatically)
-│   └── solutions.example.json   Template with schema reference
+│   └── team.example.json        Template for new deployers
 │
 ├── web/
 │   ├── app.py                   FastAPI backend — SSE, session management
-│   └── index.html               Single-page UI
+│   └── index.html               Single-page UI (vanilla JS)
 │
-├── slack/
-│   ├── bot.py                   Slack bot — /demo and /demo-continue
-│   └── deploy.py                GitHub + Railway deploy pipeline
+├── scripts/
+│   └── migrate_to_supabase.py   One-time migration from SQLite to Supabase
 │
 ├── test/
 │   ├── scripts/
@@ -116,46 +106,89 @@ demo-creation-agent/
 │
 └── docs/
     ├── ARCHITECTURE.md          This file
-    ├── PHASE2.md                Phase 2 roadmap
+    ├── USER_GUIDE.md            End-user guide
     ├── GITHUB_SETUP.md          How to get GITHUB_TOKEN
     └── RAILWAY_SETUP.md         How to get RAILWAY_TOKEN
 ```
 
 ---
 
-## Storage Architecture
+## Data Model
 
-### Static config (committed to git, baked into image)
+4 tables: `sessions`, `demos`, `session_logs`, `team_members`.
 
-| File | Purpose | Loaded by |
-|------|---------|-----------|
-| `prompts/*.md` | System prompts for each pipeline stage | `pipeline.py` at import time |
-| `registry/team.json` | Team member names (classifier uses to identify customers) | `pipeline.py` at import time |
-| `prompts/capabilities.md` | APIs, mock strategies, customer ask patterns | `pipeline.py` at import time |
+### Sessions
+A session is a single pipeline run. It owns transcript data inline.
 
-### Runtime data (managed by storage backend)
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT PK | `sess_XXXXXXXX` |
+| source | TEXT | `web`, `cli`, `slack` |
+| transcript | TEXT | Full transcript text (inline, not a separate table) |
+| meeting_link | TEXT | Optional URL to recording |
+| additional_context | TEXT | Operator-provided context |
+| email | TEXT | For auto-mode notifications |
+| status | TEXT | `idle`, `running`, `waiting_input`, `waiting_continue`, `verifying`, `deploying`, `done`, `error` |
+| current_stage | INT | 0–4 |
+| mode | TEXT | `auto` or `verbose` |
+| error | TEXT | Error message if failed |
+| stage_1_understand | JSON | Understand output |
+| stage_2_design | JSON | Design output |
+| stage_3_demo | TEXT | Generated demo code |
+| stage_4_guide | TEXT | Demo guide text |
 
-| Data | Default (JSON) | SQLite |
-|------|----------------|--------|
-| **Solutions registry** | `{DATA_DIR}/registry/solutions.json` | `solutions` table in `data.db` |
-| **Sessions** | `{DATA_DIR}/sessions/{id}.json` | `sessions` table in `data.db` |
-| **Slack state** | `{DATA_DIR}/slack/state/{channel}.json` | `slack_state` table in `data.db` |
+### Demos
+A demo is a deployed artifact. Only created after successful deployment.
 
-### Storage backends
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT PK | `demo_XXXXXXXX` |
+| session_id | TEXT FK | Links back to the session that created it |
+| company | TEXT | Customer company name |
+| name | TEXT | Demo name from Design stage |
+| deploy_url | TEXT | Live Railway URL |
+| github_repo | TEXT | GitHub repo path |
+| health_check_passed | BOOL | Whether deploy health check passed |
+| is_active | BOOL | Soft-delete flag (false = deleted) |
+| demo_type, use_case, description, stack, keywords, skills_used | Various | Metadata from pipeline |
+
+### Session Logs
+Append-only log entries per session.
+
+### Team Members
+Internal team names — used by Understand stage to distinguish team from customer in transcripts.
+
+### Key Design Decisions
+- **Demos only after deploy**: No demo record exists until Railway deploy succeeds. This means the demos table = the solutions registry.
+- **No separate solutions registry**: Every active demo is a solution candidate. `get_solutions()` returns all demos where `is_active=1`.
+- **Session owns transcript**: No separate transcripts table. Transcript text lives directly on the session row.
+- **Soft-delete via is_active**: Deleting a demo sets `is_active=0`. It won't appear in the library or be matched to future sessions.
+
+---
+
+## Storage Backends
 
 | Backend | Env var | When to use |
 |---------|---------|-------------|
-| **JSON files** (default) | `STORAGE_BACKEND=json` | Local dev, single user, zero setup |
-| **SQLite** | `STORAGE_BACKEND=sqlite` | Concurrent pipelines, better session listing |
+| **SQLite** (default) | `STORAGE_BACKEND=sqlite` | Local dev, zero setup |
+| **Supabase** | `STORAGE_BACKEND=supabase` | Production, multi-user |
 
-Both backends auto-seed solutions from `registry/solutions.json` on first boot.
+Migrations in `storage/migrations/`:
+- `*.sql` (non-`_pg`) — auto-applied by SQLite backend on startup
+- `*_pg.sql` — must be run manually in Supabase SQL Editor
 
-### DATA_DIR
+---
 
-| Environment | Value | Effect |
-|-------------|-------|--------|
-| Local dev | Defaults to project root | Runtime data lives alongside code |
-| Railway | `DATA_DIR=/data` | Runtime data on persistent volume, survives redeploys |
+## Solutions Matching
+
+The Understand stage (Stage 1) checks the solutions registry for existing demos that match the customer's need. This happens BEFORE Design/Build, saving LLM calls when a match exists.
+
+**Flow:**
+1. `get_solutions()` returns all active demos from DB
+2. Understand prompt includes the solutions list
+3. LLM uses semantic judgment: "Would this existing demo demonstrate the capability the customer asked about?"
+4. If matched → pipeline stops, UI shows match panel with link to existing demo
+5. If no match → pipeline continues to Design
 
 ---
 
@@ -168,10 +201,11 @@ Both backends auto-seed solutions from `registry/solutions.json` on first boot.
 | `GITHUB_ORG` | Deploy (optional) | GitHub org name |
 | `RAILWAY_TOKEN` | Deploy pipeline | See `docs/RAILWAY_SETUP.md` |
 | `DATA_DIR` | Railway deploy | Set to `/data` (volume mount) |
-| `STORAGE_BACKEND` | Optional | `json` (default) or `sqlite` |
+| `STORAGE_BACKEND` | Optional | `sqlite` (default) or `supabase` |
+| `SUPABASE_URL` | Supabase backend | Supabase dashboard → Settings → API |
+| `SUPABASE_KEY` | Supabase backend | Supabase dashboard → Settings → API (service_role key) |
 | `RESEND_API_KEY` | Email notifications (optional) | resend.com |
-| `SLACK_BOT_TOKEN` | Slack bot only | Slack app dashboard |
-| `SLACK_APP_TOKEN` | Slack bot only | Slack app dashboard |
+| `ADMIN_TOKEN` | Admin API endpoints | Any strong secret |
 
 ---
 
@@ -189,16 +223,15 @@ uvicorn web.app:app --port 8000   # Open http://localhost:8000
 
 ## Model Configuration
 
-All stages use `claude-sonnet-4-20250514`:
+All stages use `claude-sonnet-4-20250514` (configurable via `BUILDER_ANTHROPIC_MODEL` env var):
 
 | Stage | max_tokens |
 |-------|-----------|
-| Classifier | 2000 |
-| Dependency Checker | 2000 |
-| Solutions Matcher | 2000 |
-| SDR Messenger | 1500 |
-| Demo Builder | 16000 |
-| Demo Guide | 1000 |
+| Understand | 4000 |
+| Design | 6000 |
+| Build | 16000 |
+| Verify | 16000 |
+| Guide | 1000 |
 
 ---
 
@@ -206,9 +239,10 @@ All stages use `claude-sonnet-4-20250514`:
 
 When a demo is built, `deploy.py` handles:
 1. Parse markdown output into individual files
-2. Create GitHub repo under `GITHUB_ORG` (or personal account)
-3. Push all files via Git Tree API (single commit)
-4. Create Railway project + service linked to the repo
-5. Trigger deploy + provision public domain
-6. Poll until deployment succeeds (up to 5 min timeout)
-7. Append solution entry to the registry
+2. Static analysis + verification agent (fix issues before deploy)
+3. Create GitHub repo under `GITHUB_ORG` (or personal account)
+4. Push all files via Git Tree API (single commit)
+5. Create Railway project + service linked to the repo
+6. Trigger deploy + provision public domain
+7. Health check — verify the deployed app responds
+8. On success: save demo to DB with deploy_url and health_check status

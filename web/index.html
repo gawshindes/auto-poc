@@ -802,7 +802,7 @@ const STAGES = [
   { id: 1, name: "Stage 1 -- Understand" },
   { id: 2, name: "Stage 2 -- Design" },
   { id: 3, name: "Stage 3 -- Build" },
-  { id: 4, name: "Stage 4 -- Guide" },
+  { id: 4, name: "Stage 4 -- Deploy" },
 ];
 
 let sessionId = null;
@@ -1707,10 +1707,10 @@ async function toggleSessionCard(sid) {
         </div>`;
       }
 
-      // Stage 4 — Guide
+      // Stage 4 — Deploy
       if (session.stage_4_guide) {
         detailHtml += `<div class="session-debug-section">
-          <div class="session-debug-label">Stage 4 -- Guide</div>
+          <div class="session-debug-label">Stage 4 -- Deploy</div>
           <details>
             <summary style="font-size:0.75rem;color:#b0aea5;cursor:pointer;">Show guide</summary>
             <pre class="output" style="margin-top:4px;max-height:200px;">${escapeHtml(session.stage_4_guide)}</pre>
@@ -1917,9 +1917,9 @@ function renderSessionDetail(sid) {
     html += `<div class="session-detail-section"><h4>Stage 3 — Build</h4><div style="font-size:0.8rem;color:#555">${s.stage_3_demo.length.toLocaleString()} chars of code generated</div></div>`;
   }
 
-  // Stage 4 — Guide
+  // Stage 4 — Deploy
   if (s.stage_4_guide) {
-    html += `<div class="session-detail-section"><h4>Stage 4 — Guide</h4><pre style="white-space:pre-wrap;font-size:0.78rem;max-height:200px;overflow-y:auto">${escapeHtml(s.stage_4_guide)}</pre></div>`;
+    html += `<div class="session-detail-section"><h4>Stage 4 — Deploy</h4><pre style="white-space:pre-wrap;font-size:0.78rem;max-height:200px;overflow-y:auto">${escapeHtml(s.stage_4_guide)}</pre></div>`;
   }
 
   // Logs
