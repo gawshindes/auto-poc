@@ -44,11 +44,22 @@ PROMPTS = {
     "understand":       _load_prompt("01_understand.md"),
     "design":           _load_prompt("02_design.md"),
     "builder":          _load_prompt("03_build.md"),
+    "verify":           _load_prompt("03b_verify.md"),
     "guide":            _load_prompt("04_guide.md"),
     "capabilities":     _load_prompt("capabilities.md"),
 }
 
-TEAM = _load_registry("team.json", default={"team": []})
+def _get_team() -> list[str]:
+    """Get team members from DB, falling back to registry/team.json for migration."""
+    try:
+        team = _get_backend().get_team()
+        if team:
+            return team
+    except Exception:
+        pass
+    # Fallback to file for backward compat during migration
+    data = _load_registry("team.json", default={"team": []})
+    return data.get("team", [])
 
 _client: anthropic.Anthropic | None = None
 
@@ -107,11 +118,14 @@ def _parse_json(raw: str, stage_name: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def run_understand(transcript: str) -> dict:
-    """Stage 1: Classify + dependencies + knowledge resolution in one call."""
+    """Stage 1: Classify + dependencies + knowledge resolution + solutions match."""
+    team = _get_team()
+    solutions = json.dumps(_get_backend().get_solutions(), indent=2)
     content = (
         f"Internal team members (anyone else is the customer):\n"
-        f"{json.dumps(TEAM['team'], indent=2)}\n\n"
+        f"{json.dumps(team, indent=2)}\n\n"
         f"Agency capabilities:\n{PROMPTS['capabilities']}\n\n"
+        f"Solutions registry (existing demos):\n{solutions}\n\n"
         f"Analyze this transcript:\n\n{transcript}"
     )
     return _parse_json(run_stage(PROMPTS["understand"], content, max_tokens=4000), "Understand")
@@ -164,10 +178,20 @@ def run_build(design_output: dict, customer_inputs: str = "") -> str:
     content = (
         f"Demo spec:\n{json.dumps(demo_spec, indent=2)}\n\n"
         f"Component matches:\n{json.dumps(component_matches, indent=2)}\n\n"
-        f"Requested Skill Adapters (Do NOT redefine these, just import them from skills.{skill_name}):\n{skill_adapters or 'None'}\n\n"
+        f"Requested Skill Adapters (Do NOT redefine these, import from their skills.* package):\n{skill_adapters or 'None'}\n\n"
         f"Customer-provided inputs:\n{customer_inputs or 'None'}"
     )
     return run_stage(PROMPTS["builder"], content, max_tokens=16000, strip_fences=False)
+
+
+def run_verify(demo_output: str, issues: list[str]) -> str:
+    """Stage 3b: Fix code issues found by static analysis."""
+    content = (
+        f"Demo code:\n{demo_output}\n\n"
+        f"Issues found by static analysis:\n"
+        + "\n".join(f"- {issue}" for issue in issues)
+    )
+    return run_stage(PROMPTS["verify"], content, max_tokens=16000, strip_fences=False)
 
 
 def run_guide(understand_output: dict, demo_output: str, live_url: str = "") -> str:

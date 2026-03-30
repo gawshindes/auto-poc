@@ -120,22 +120,37 @@ NO  -> MOCK IT (never block the demo)
 
 ## Task 3 — Knowledge Resolution
 
-For each item in `ask_customer`, ask: "Could a knowledgeable consultant in this industry answer this without talking to this specific customer?"
+For each item in `ask_customer`, ask yourself one question:
 
-**Can answer (resolve it yourself):**
-- Industry-standard workflows, SOPs, and best practices
-- Typical business parameters with industry defaults
-- Public data that can be approximated
-- Anything that could be filled with a realistic placeholder the founder can correct later
+> "Could an LLM generate a realistic, non-embarrassing version of this — or does it require data that ONLY this specific customer possesses?"
 
-**Cannot answer (keep in ask_customer):**
-- Private business data: specific API keys, account credentials
-- URLs specific to this customer's accounts
-- Customer-specific pricing, margins, proprietary rates
-- Customer-specific file uploads (their CSV, logo, actual product list)
-- Anything where guessing wrong would make the demo look embarrassing
+**If an LLM can generate it → resolve it yourself.** Move it to `resolved_by_knowledge` with your generated content. This includes: industry SOPs, standard procedures, sample scenarios, typical workflows, example data structures, common business processes, best practices — anything where a realistic placeholder works and the founder can refine later.
 
-After resolution, update `ask_customer` to contain ONLY the items you truly cannot answer. Move resolved items to `resolved_by_knowledge`.
+**If only the customer has it → keep in `ask_customer`.** This means: their specific account URLs, their API credentials, their proprietary data files, their store/profile URLs (even public ones — you don't know the exact URL), any data source the demo will actually fetch from at runtime.
+
+The bar for keeping something in `ask_customer` is high: "Would the demo break or show wrong data without the customer's exact input?" If the answer is no — if you could fill it with realistic content — resolve it yourself.
+
+After resolution, `ask_customer` should contain ONLY items where the customer's specific data is irreplaceable. Move everything else to `resolved_by_knowledge`.
+
+## Task 4 — Solutions Match
+
+You are given a **Solutions Registry** — a list of demos already built and ready to show. Before planning a new build, check if any existing solution already covers the customer's need.
+
+### Matching Rules
+
+Use semantic judgment, NOT keyword counting:
+
+> "If a founder picked up this existing solution and showed it to this customer, would the customer understand what they're getting?"
+
+**Match** — Same core workflow, problem type, and interaction model. The existing demo demonstrates the exact capability the customer asked about.
+
+**No match** — Genuinely different use case. "Both use AI" is not a match.
+
+**Key principle:** Bias toward matching when we have it. Showing an existing live demo is always faster and more impressive than building from scratch.
+
+If a match is found, set `existing_solution_match.matched: true` with the solution details. The pipeline will skip Design/Build entirely and present the existing demo.
+
+If no match, set `existing_solution_match.matched: false`. The pipeline will continue to the Design stage.
 
 ## Output Format
 
@@ -190,6 +205,13 @@ Return ONLY this JSON. No preamble, no explanation.
   "integration_opportunities": [
     {"system": "", "use_case": "Why this would enhance the demo"}
   ],
-  "notes_for_designer": ""
+  "notes_for_designer": "",
+  "existing_solution_match": {
+    "matched": false,
+    "solution_id": "null | id from registry",
+    "solution_name": "null | name from registry",
+    "deploy_url": "null | url from registry",
+    "match_reasoning": "Why this solution fits (or why no match)"
+  }
 }
 ```
