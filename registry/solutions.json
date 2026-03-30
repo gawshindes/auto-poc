@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-26",
+  "note": "Add every completed demo here after it's built. This registry is checked BEFORE building anything new. Matching is semantic — the LLM reads name, description, and demo_type to decide if a solution is reusable. source field: 'manual' = built outside the deploy tool (no URL expected), 'demo_tool' = auto-deployed by deploy.py (Railway URL available).",
+  "solutions": [
+    {
+      "id": "sol_001",
+      "name": "Voice Agent — Inbound + Outbound",
+      "description": "AI voice agent handling inbound customer calls and outbound follow-ups with natural conversation flow. Conducts screening interviews, captures profile information, and routes or follows up automatically.",
+      "demo_type": "voice_agent",
+      "stack": "11Labs",
+      "source": "manual",
+      "demo_url": null,
+      "status": "built",
+      "note": "Demo created on 11labs — no URL needed"
+    },
+    {
+      "id": "sol_002",
+      "name": "SEO + AO Content Generation Tool",
+      "description": "AI-powered tool for generating SEO-optimized and audience-optimized marketing content. Takes a topic or product and outputs blog posts, social media copy, and meta descriptions tailored to the target audience.",
+      "demo_type": "content_tool",
+      "stack": "Python + Claude API",
+      "source": "manual",
+      "demo_url": null,
+      "status": "built",
+      "note": "Marketing team's tool — contact Marketing for demo"
+    },
+    {
+      "id": "sol_004",
+      "name": "Mister Mac — Chat Agent Demo",
+      "description": "A real-time AI technical support copilot that listens to customer conversations, watches screen shares via FaceTime SharePlay, and provides step-by-step guidance text to junior technicians during live support calls.",
+      "built_for": "Mister Mac",
+      "demo_type": "chat_agent",
+      "what_to_customize": [
+        "Must work in real-time during live calls",
+        "Speed is critical - can't have delays",
+        "May need to run locally on Mac Mini",
+        "$5-8k budget"
+      ],
+      "reuse_effort": "low",
+      "hosting": "Railway",
+      "stack": "Auto-deployed via demo_tool",
+      "source": "demo_tool",
+      "status": "built",
+      "demo_url": "https://demo-mister-mac-production-6462.up.railway.app"
+    },
+    {
+      "id": "sol_005",
+      "name": "Construction RFP Automation Platform",
+      "description": "AI-powered workflow automation for sending RFP requests to subcontractors, tracking responses, following up on delays, and comparing pricing to historical data. Integrates with Teams-based project management.",
+      "built_for": "Lush Home",
+      "demo_type": "workflow_automation",
+      "stack": "Python + FastAPI + Claude API",
+      "source": "demo_tool",
+      "status": "built",
+      "demo_url": "https://demo-lush-home-production-0c85.up.railway.app"
+    },
+    {
+      "id": "sol_006",
+      "name": "Solar Proposal Generator + CRM",
+      "description": "AI-powered solar proposal generation using utility data, integrated CRM pipeline, and lead cost analysis for solar installers",
+      "built_for": "Prime Home Solutions",
+      "demo_type": "workflow_automation",
+      "stack": "Python + FastAPI + Claude API",
+      "source": "demo_tool",
+      "status": "built",
+      "demo_url": null
+    }
+  ]
+}

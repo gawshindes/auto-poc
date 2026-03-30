@@ -128,6 +128,9 @@ Always include fallback mock data for external sources. The demo should NEVER cr
            return default if default is not None else []
    ```
 
+5. **Strict Version Compatibility** — You are provided specific package versions (e.g., `fastapi>=0.110.0`). You MUST use the correct syntax and API signatures for those specific versions, avoiding deprecated syntax. 
+   - *Example*: For FastAPI `0.110.0+` (Starlette `0.36+`), `TemplateResponse` requires `request` to be explicitly named or passed as the first positional argument: `templates.TemplateResponse(request=request, name="index.html", context={...})`. Never use the old `TemplateResponse("index.html", {"request": request})` signature as it crashes at runtime with `TypeError: unhashable type: 'dict'`.
+
 ## Mock Data Standards
 When mocking data per the spec:
 - Use realistic names, prices, companies from the customer's industry

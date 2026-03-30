@@ -9,12 +9,41 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Open Sans', sans-serif; background: #faf9f5; color: #4a4845; min-height: 100vh; }
   h1, h2, h3, h4, button, label, .label, .badge, .stage-name, .section-label,
-  .mode-title, .pipeline-header .company, .session-company, th { font-family: 'Roboto', sans-serif; }
+  .mode-title, .pipeline-header .company, th { font-family: 'Roboto', sans-serif; }
 
   .app { max-width: 780px; margin: 0 auto; padding: 40px 24px 80px; }
+  .app.wide { max-width: 960px; }
 
-  h1 { font-size: 1.4rem; font-weight: 700; color: #141413; margin-bottom: 4px; }
-  .subtitle { font-size: 0.85rem; color: #b0aea5; margin-bottom: 40px; }
+  /* Tab Navigation */
+  .tab-nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 32px;
+    border-bottom: 1px solid #e8e6dc;
+  }
+  .tab-nav .brand {
+    font-family: 'Roboto', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #141413;
+    margin-right: auto;
+    padding-bottom: 10px;
+    text-decoration: none;
+  }
+  .tab-nav .tab {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #b0aea5;
+    padding: 8px 18px 10px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    text-decoration: none;
+  }
+  .tab-nav .tab:hover { color: #4a4845; }
+  .tab-nav .tab.active { color: #d97757; border-bottom-color: #d97757; }
 
   /* Views */
   .view { display: none; }
@@ -36,17 +65,6 @@
   .drop-zone p { color: #b0aea5; font-size: 0.9rem; }
   .drop-zone p strong { color: #4a4845; }
   .drop-zone .hint { font-size: 0.78rem; color: #b0aea5; margin-top: 6px; }
-
-  .session-row { display:flex; align-items:center; gap:1rem; padding:0.65rem 0.9rem; border-radius:8px; background:#ffffff; border:1px solid #e8e6dc; cursor:pointer; margin-bottom:0.5rem; transition:border-color 0.15s; }
-  .session-row:hover { border-color:#d97757; }
-  .session-company { font-weight:500; color:#141413; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .session-badge { font-size:0.72rem; padding:3px 10px; border-radius:20px; font-weight:600; white-space:nowrap; font-family:'Roboto',sans-serif; }
-  .badge-running { background:#e8eddf; color:#788c5d; }
-  .badge-done { background:#f5e6df; color:#d97757; }
-  .badge-error { background:#fce8e7; color:#c0463a; }
-  .badge-waiting { background:#fdf3dd; color:#c4973a; }
-  .badge-idle { background:#f0efe9; color:#b0aea5; }
-  .session-meta { font-size:0.78rem; color:#b0aea5; white-space:nowrap; }
 
   /* Mode selection */
   .file-name-bar {
@@ -152,6 +170,9 @@
     transition: background 0.15s;
   }
   .btn-ghost:hover { background: #e8e6dc; }
+  .btn-sm { padding: 8px 16px; font-size: 13px; }
+  .btn-danger { background: #c0463a; }
+  .btn-danger:hover { background: #a33b30; }
 
   /* Pipeline view */
   .pipeline-header { margin-bottom: 28px; }
@@ -295,17 +316,21 @@
     font-family: 'Open Sans', sans-serif;
   }
 
-  /* Header nav */
-  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
-  .header h1 { margin-bottom:0; }
-  .nav-link { font-size:0.82rem; color:#b0aea5; cursor:pointer; text-decoration:none; transition:color 0.15s; font-family:'Roboto',sans-serif; font-weight:500; }
-  .nav-link:hover { color:#d97757; }
+  /* Status badges */
+  .session-badge { font-size:0.72rem; padding:3px 10px; border-radius:20px; font-weight:600; white-space:nowrap; font-family:'Roboto',sans-serif; }
+  .badge-running { background:#e8eddf; color:#788c5d; }
+  .badge-done { background:#f5e6df; color:#d97757; }
+  .badge-error { background:#fce8e7; color:#c0463a; }
+  .badge-waiting { background:#fdf3dd; color:#c4973a; }
+  .badge-idle { background:#f0efe9; color:#b0aea5; }
+  .badge-verified { background:#e8eddf; color:#3d7a3d; }
+  .badge-deploy-failed { background:#fce8e7; color:#c0463a; }
+  .badge-deploying { background:#e3eef7; color:#6a9bcc; }
+  .badge-verifying { background:#fdf3dd; color:#c4973a; }
+  .badge-not-deployed { background:#f0efe9; color:#b0aea5; }
+  .badge-registry { background:#e3eef7; color:#6a9bcc; font-size:0.68rem; padding:2px 8px; }
 
-  /* Settings */
-  .settings-section { margin-bottom:2.5rem; }
-  .settings-section h2 { font-size:1rem; font-weight:600; color:#141413; margin-bottom:0.75rem; }
-  .settings-section p.desc { font-size:0.85rem; color:#b0aea5; margin-bottom:1rem; font-family:'Open Sans',sans-serif; }
-
+  /* Team */
   .team-list { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:1rem; }
   .team-chip {
     display:inline-flex; align-items:center; gap:6px;
@@ -321,31 +346,207 @@
     padding:8px 12px; color:#141413; font-size:0.85rem; font-family:'Open Sans',sans-serif; outline:none;
   }
   .add-row input:focus { border-color:#d97757; }
-  .btn-sm { padding:8px 16px; font-size:13px; }
-
-  .sol-table { width:100%; border-collapse:collapse; }
-  .sol-table th { text-align:left; font-size:11px; color:#b0aea5; text-transform:uppercase; letter-spacing:0.08em; padding:10px 8px; border-bottom:1px solid #e8e6dc; background:#faf9f5; }
-  .sol-table td { font-size:0.82rem; color:#4a4845; padding:12px 8px; border-bottom:1px solid #f0efe9; font-family:'Open Sans',sans-serif; }
-  .sol-table tr:last-child td { border-bottom:none; }
-  .sol-table tr:hover td { background:#faf9f5; }
-  .sol-table .sol-name { font-weight:600; color:#141413; font-family:'Roboto',sans-serif; }
-  .sol-table .sol-id { font-size:0.72rem; color:#b0aea5; font-family:'Roboto Mono',monospace; }
-  .sol-delete { cursor:pointer; color:#b0aea5; font-size:0.78rem; font-family:'Roboto',sans-serif; }
-  .sol-delete:hover { color:#c0463a; }
-
-  .sol-form { background:#ffffff; border:1px solid #e8e6dc; border-radius:10px; padding:16px; margin-top:1rem; }
-  .sol-form .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
-  .sol-form .form-full { grid-column:1/-1; }
-  .sol-form label { display:block; font-size:11px; color:#b0aea5; margin-bottom:4px; font-family:'Roboto',sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; }
-  .sol-form input, .sol-form select {
-    width:100%; background:#faf9f5; border:1px solid #e8e6dc; border-radius:6px;
-    padding:8px 10px; color:#141413; font-size:0.82rem; font-family:'Open Sans',sans-serif; outline:none;
-  }
-  .sol-form input:focus, .sol-form select:focus { border-color:#d97757; }
 
   .upload-json-row { display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid #e8e6dc; }
   .upload-json-label { font-size:0.75rem; color:#b0aea5; font-family:'Open Sans',sans-serif; }
   .upload-json-btn { cursor:pointer; display:inline-block; }
+
+  .section-desc { font-size:0.85rem; color:#b0aea5; margin-bottom:1.5rem; font-family:'Open Sans',sans-serif; }
+
+  /* Library filter bar */
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .filter-bar input[type="text"] {
+    flex: 1;
+    min-width: 180px;
+    background: #ffffff;
+    border: 1px solid #e8e6dc;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #141413;
+    font-size: 0.85rem;
+    font-family: 'Open Sans', sans-serif;
+    outline: none;
+  }
+  .filter-bar input:focus { border-color: #d97757; }
+  .filter-bar select {
+    background: #ffffff;
+    border: 1px solid #e8e6dc;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #4a4845;
+    font-size: 0.82rem;
+    font-family: 'Open Sans', sans-serif;
+    outline: none;
+    cursor: pointer;
+  }
+  .filter-bar select:focus { border-color: #d97757; }
+
+  /* Demo table */
+  .demo-table { width:100%; border-collapse:collapse; }
+  .demo-table th { text-align:left; font-size:11px; color:#b0aea5; text-transform:uppercase; letter-spacing:0.08em; padding:10px 8px; border-bottom:1px solid #e8e6dc; background:#faf9f5; }
+  .demo-table td { font-size:0.82rem; color:#4a4845; padding:12px 8px; border-bottom:1px solid #f0efe9; font-family:'Open Sans',sans-serif; }
+  .demo-table tr:last-child td { border-bottom:none; }
+  .demo-table tbody tr { cursor:pointer; transition:background 0.1s; }
+  .demo-table tbody tr:hover td { background:#faf9f5; }
+  .demo-table .demo-name { font-weight:600; color:#141413; font-family:'Roboto',sans-serif; }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #b0aea5;
+    font-size: 0.9rem;
+  }
+
+  /* Add Demo form */
+  .add-demo-form {
+    background: #ffffff;
+    border: 1px solid #e8e6dc;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 1.25rem;
+    display: none;
+  }
+  .add-demo-form.visible { display: block; }
+  .add-demo-form h3 { font-size: 0.92rem; font-weight: 600; color: #141413; margin-bottom: 14px; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .form-full { grid-column:1/-1; }
+  .add-demo-form label { display:block; font-size:11px; color:#b0aea5; margin-bottom:4px; font-family:'Roboto',sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; }
+  .add-demo-form input, .add-demo-form select {
+    width:100%; background:#faf9f5; border:1px solid #e8e6dc; border-radius:6px;
+    padding:8px 10px; color:#141413; font-size:0.82rem; font-family:'Open Sans',sans-serif; outline:none;
+  }
+  .add-demo-form input:focus, .add-demo-form select:focus { border-color:#d97757; }
+
+  /* Demo detail view */
+  .back-link {
+    font-size: 0.82rem;
+    color: #b0aea5;
+    cursor: pointer;
+    margin-bottom: 1.25rem;
+    display: inline-block;
+    font-family: 'Roboto', sans-serif;
+  }
+  .back-link:hover { color: #d97757; }
+
+  .detail-card {
+    background: #ffffff;
+    border: 1px solid #e8e6dc;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .detail-card h3 {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #b0aea5;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 12px;
+  }
+  .detail-title { font-size: 1.15rem; font-weight: 700; color: #141413; margin-bottom: 4px; }
+  .detail-subtitle { font-size: 0.88rem; color: #b0aea5; margin-bottom: 16px; }
+  .detail-desc { font-size: 0.88rem; color: #4a4845; margin-bottom: 16px; line-height: 1.5; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.82rem; }
+  .detail-grid .meta-label { font-size: 0.68rem; color: #b0aea5; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px; font-family: 'Roboto', sans-serif; font-weight: 600; }
+  .detail-grid .meta-val { color: #141413; }
+  .detail-grid .meta-val a { color: #5b6af0; text-decoration: none; word-break: break-all; }
+  .detail-grid .meta-val a:hover { text-decoration: underline; }
+  .detail-grid .full { grid-column: 1 / -1; }
+
+  .chip-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .chip {
+    display: inline-block;
+    background: #f0efe9;
+    border: 1px solid #e8e6dc;
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
+    color: #4a4845;
+    font-family: 'Roboto', sans-serif;
+  }
+
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #faf9f5;
+    border: 1px solid #e8e6dc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+  }
+  .link-row .link-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #b0aea5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: 'Roboto', sans-serif;
+    min-width: 80px;
+  }
+  .link-row a { color: #5b6af0; text-decoration: none; word-break: break-all; flex: 1; }
+  .link-row a:hover { text-decoration: underline; }
+  .link-row .link-badge { margin-left: auto; }
+
+  .detail-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+  /* Session debug cards */
+  .session-card {
+    background: #ffffff;
+    border: 1px solid #e8e6dc;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .session-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+  }
+  .session-card-header:hover { background: #faf9f5; }
+  .session-card-id { font-size: 0.75rem; color: #b0aea5; font-family: 'Roboto Mono', monospace; cursor:pointer; transition:color 0.15s; }
+  .session-card-id:hover { color: #d97757; }
+  .session-card-info { flex: 1; font-size: 0.82rem; color: #4a4845; }
+  .session-card-chevron { color: #d4d2c9; font-size: 0.7rem; transition: transform 0.2s; }
+  .session-card.expanded .session-card-chevron { transform: rotate(90deg); }
+  .session-card-body {
+    display: none;
+    border-top: 1px solid #f0efe9;
+    padding: 16px;
+  }
+  .session-card.expanded .session-card-body { display: block; }
+  .session-debug-section { margin-bottom: 16px; }
+  .session-debug-section:last-child { margin-bottom: 0; }
+  .session-debug-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #b0aea5;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-family: 'Roboto', sans-serif;
+    margin-bottom: 6px;
+  }
+  .session-logs .log-line {
+    font-size: 0.72rem;
+    color: #4a4845;
+    padding: 2px 0;
+    font-family: 'Roboto Mono', monospace;
+    border-bottom: 1px solid #f5f4f0;
+  }
+  .session-logs .log-line .log-ts { color: #b0aea5; }
+  .session-logs .log-line.log-error { color: #c0463a; }
+  .session-logs .log-line.log-warn { color: #c4973a; }
 
   .toast {
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
@@ -355,92 +556,225 @@
     opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:100;
   }
   .toast.visible { opacity:1; }
+
+  /* Session list */
+  .session-table { width:100%; border-collapse:collapse; }
+  .session-table th { text-align:left; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em; color:#888; padding:6px 10px; border-bottom:1px solid #e8e4df; font-family:'Roboto',sans-serif; }
+  .session-table td { padding:10px; font-size:0.85rem; border-bottom:1px solid #f0ece7; vertical-align:middle; }
+  .session-table tr.session-row { cursor:pointer; transition:background 0.15s; }
+  .session-table tr.session-row:hover { background:#faf7f4; }
+  .session-expand { display:none; }
+  .session-expand.open { display:table-row; }
+  .session-expand td { padding:16px 10px; background:#faf7f4; }
+
+  .sess-badge {
+    display:inline-block; font-size:0.68rem; font-weight:600; padding:2px 8px; border-radius:10px;
+    font-family:'Roboto',sans-serif; text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .sess-badge.running   { background:#dbeafe; color:#1d4ed8; }
+  .sess-badge.waiting    { background:#fef3c7; color:#92400e; }
+  .sess-badge.deploying  { background:#e0e7ff; color:#4338ca; }
+  .sess-badge.verifying  { background:#ede9fe; color:#6d28d9; }
+  .sess-badge.done       { background:#d1fae5; color:#065f46; }
+  .sess-badge.error      { background:#fee2e2; color:#991b1b; }
+  .sess-badge.idle       { background:#f3f4f6; color:#6b7280; }
+
+  .nav-chip {
+    display:inline-block; font-size:0.72rem; padding:2px 8px; border-radius:12px;
+    background:#e3eef7; color:#5b6af0; cursor:pointer; text-decoration:none;
+    font-family:'Roboto',sans-serif; transition:background 0.15s;
+  }
+  .nav-chip:hover { background:#d0e0f0; }
+
+  .session-detail-section { margin:12px 0; }
+  .session-detail-section h4 { font-size:0.8rem; color:#888; text-transform:uppercase; margin:0 0 6px; font-family:'Roboto',sans-serif; }
+  .session-detail-section pre { background:#fff; border:1px solid #e8e4df; border-radius:6px; padding:10px; font-size:0.78rem; overflow-x:auto; max-height:300px; }
+  .session-detail-actions { display:flex; gap:8px; margin-top:12px; }
+  .session-detail-actions .btn { font-size:0.78rem; padding:5px 12px; }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="header">
-    <h1><a href="/" style="color:inherit;text-decoration:none;">Demo Creation Pipeline</a></h1>
-    <a class="nav-link" id="nav-settings" onclick="showSettings()">Settings</a>
-  </div>
-  <p class="subtitle">Upload a discovery call transcript to analyze and build a demo</p>
+<div class="app" id="app-container">
+  <!-- Tab Navigation -->
+  <nav class="tab-nav">
+    <a class="brand" href="/">Demo Pipeline</a>
+    <a class="tab active" data-tab="create" onclick="switchTab('create')">Create Demo</a>
+    <a class="tab" data-tab="demos" onclick="switchTab('demos')">Demo Library</a>
+    <a class="tab" data-tab="sessions" onclick="switchTab('sessions')">Sessions</a>
+    <a class="tab" data-tab="team" onclick="switchTab('team')">Team</a>
+  </nav>
 
-  <!-- View 1: Upload -->
-  <div class="view active" id="view-upload">
-    <div class="drop-zone" id="drop-zone">
-      <input type="file" id="file-input" accept=".txt,.pdf,.md">
-      <div class="icon">📄</div>
-      <p><strong>Drop transcript here</strong> or click to browse</p>
-      <p class="hint">Supports .txt and .pdf (Spiky export)</p>
-    </div>
+  <!-- ================================================================== -->
+  <!-- TAB 1: CREATE DEMO                                                 -->
+  <!-- ================================================================== -->
 
-    <div id="recent-sessions" style="display:none; margin-top:2rem;">
-      <h3 style="color:#888;font-size:0.85rem;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:0.75rem;">Recent Sessions</h3>
-      <div id="sessions-list"></div>
-    </div>
-  </div>
-
-  <!-- View 2: Mode selection -->
-  <div class="view" id="view-mode">
-    <div class="file-name-bar">
-      <span>📄</span>
-      <span class="name" id="file-name-display"></span>
-      <span style="margin-left:auto;font-size:0.75rem;color:#444;cursor:pointer" onclick="resetToUpload()">✕ change file</span>
-    </div>
-
-    <div class="mode-grid">
-      <div class="mode-card selected" id="card-verbose" onclick="selectMode('verbose')">
-        <div class="badge badge-blue">Verbose</div>
-        <div class="mode-title">Step by Step</div>
-        <div class="mode-desc">Review each stage before continuing. You control the pace and can inspect every output.</div>
-      </div>
-      <div class="mode-card" id="card-auto" onclick="selectMode('auto')">
-        <div class="badge badge-green">Auto</div>
-        <div class="mode-title">Let Me Handle It</div>
-        <div class="mode-desc">Runs all stages automatically. Only stops if customer inputs are needed. Get notified by email when done.</div>
+  <div class="tab-content" id="tab-create">
+    <!-- View 1: Upload -->
+    <div class="view active" id="view-upload">
+      <p class="section-desc">Upload a discovery call transcript to analyze and build a demo</p>
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".txt,.pdf,.md">
+        <div class="icon">+</div>
+        <p><strong>Drop transcript here</strong> or click to browse</p>
+        <p class="hint">Supports .txt and .pdf (Spiky export)</p>
       </div>
     </div>
 
-    <div class="context-row">
-      <label>Additional context (optional)</label>
-      <textarea id="context-input" placeholder="E.g. focus on the scheduling feature, customer uses Shopify, build a dark-themed UI..."></textarea>
-      <div class="hint">This is sent directly to the demo builder — use it to guide the output.</div>
+    <!-- View 2: Mode selection -->
+    <div class="view" id="view-mode">
+      <div class="file-name-bar">
+        <span>FILE</span>
+        <span class="name" id="file-name-display"></span>
+        <span style="margin-left:auto;font-size:0.75rem;color:#444;cursor:pointer" onclick="resetToUpload()">x change file</span>
+      </div>
+
+      <div class="mode-grid">
+        <div class="mode-card selected" id="card-verbose" onclick="selectMode('verbose')">
+          <div class="badge badge-blue">Verbose</div>
+          <div class="mode-title">Step by Step</div>
+          <div class="mode-desc">Review each stage before continuing. You control the pace and can inspect every output.</div>
+        </div>
+        <div class="mode-card" id="card-auto" onclick="selectMode('auto')">
+          <div class="badge badge-green">Auto</div>
+          <div class="mode-title">Let Me Handle It</div>
+          <div class="mode-desc">Runs all stages automatically. Only stops if customer inputs are needed. Get notified by email when done.</div>
+        </div>
+      </div>
+
+      <div class="context-row">
+        <label>Additional context (optional)</label>
+        <textarea id="context-input" placeholder="E.g. focus on the scheduling feature, customer uses Shopify, build a dark-themed UI..."></textarea>
+        <div class="hint">This is sent directly to the demo builder -- use it to guide the output.</div>
+      </div>
+
+      <div class="email-row" id="email-row">
+        <label>Email for completion notification (optional)</label>
+        <input type="email" id="email-input" placeholder="you@example.com">
+      </div>
+
+      <button class="btn" onclick="startPipeline()">Start Pipeline</button>
     </div>
 
-    <div class="email-row" id="email-row">
-      <label>Email for completion notification (optional)</label>
-      <input type="email" id="email-input" placeholder="you@example.com">
-    </div>
+    <!-- View 3: Pipeline running -->
+    <div class="view" id="view-pipeline">
+      <div class="pipeline-header">
+        <div class="company" id="pipeline-company">Analyzing...</div>
+        <div class="mode-tag" id="pipeline-mode-tag"></div>
+      </div>
 
-    <button class="btn" onclick="startPipeline()">Start Pipeline →</button>
-  </div>
+      <div class="stage-list" id="stage-list"></div>
 
-  <!-- View 3: Pipeline running -->
-  <div class="view" id="view-pipeline">
-    <div class="pipeline-header">
-      <div class="company" id="pipeline-company">Analyzing...</div>
-      <div class="mode-tag" id="pipeline-mode-tag"></div>
-    </div>
+      <div id="action-area"></div>
 
-    <div class="stage-list" id="stage-list">
-      <!-- Stages rendered by JS -->
-    </div>
-
-    <div id="action-area"></div>
-
-    <div class="log-panel">
-      <div class="log-toggle" onclick="toggleLogs()">▶ Show logs</div>
-      <div id="log-list">
-        <!-- Log entries appended here -->
+      <div class="log-panel">
+        <div class="log-toggle" onclick="toggleLogs()">Show logs</div>
+        <div id="log-list"></div>
       </div>
     </div>
   </div>
 
-  <!-- View 4: Settings -->
-  <div class="view" id="view-settings">
-    <div class="settings-section">
-      <h2>Team Members</h2>
-      <p class="desc">Anyone not in this list is treated as a customer in transcripts.</p>
+  <!-- ================================================================== -->
+  <!-- TAB 2: SESSIONS                                                    -->
+  <!-- ================================================================== -->
+
+  <div class="tab-content" id="tab-sessions" style="display:none">
+    <div class="view active" id="view-sessions">
+      <p class="section-desc" style="margin:0 0 16px;color:#666;font-size:0.9rem;">All pipeline sessions — active, completed, and failed runs.</p>
+      <div class="filter-bar">
+        <input type="text" id="session-filter-search" placeholder="Search sessions..." oninput="filterSessions()">
+        <select id="session-filter-status" onchange="filterSessions()">
+          <option value="">All statuses</option>
+          <option value="running">Running</option>
+          <option value="waiting_input">Waiting</option>
+          <option value="waiting_continue">Waiting</option>
+          <option value="deploying">Deploying</option>
+          <option value="verifying">Verifying</option>
+          <option value="done">Done</option>
+          <option value="error">Error</option>
+          <option value="idle">Idle</option>
+        </select>
+      </div>
+      <div id="session-list-wrap"></div>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- TAB 3: DEMOS                                                       -->
+  <!-- ================================================================== -->
+
+  <div class="tab-content" id="tab-demos" style="display:none">
+    <!-- List View -->
+    <div class="view active" id="view-demos">
+      <div class="filter-bar">
+        <input type="text" id="filter-search" placeholder="Search demos..." oninput="filterDemos()">
+        <select id="filter-type" onchange="filterDemos()">
+          <option value="">All types</option>
+          <option value="web_app">Web App</option>
+          <option value="chat_agent">Chat Agent</option>
+          <option value="voice_agent">Voice Agent</option>
+          <option value="workflow_automation">Workflow</option>
+        </select>
+        <select id="filter-status" onchange="filterDemos()">
+          <option value="">All statuses</option>
+          <option value="verified">Verified</option>
+          <option value="failed">Failed</option>
+        </select>
+        <select id="filter-source" onchange="filterDemos()">
+          <option value="">All sources</option>
+          <option value="web">Web</option>
+          <option value="manual">Manual</option>
+        </select>
+        <button class="btn btn-sm" onclick="toggleAddDemoForm()">+ Add Demo</button>
+      </div>
+
+      <div id="demo-table-wrap"></div>
+
+      <div class="add-demo-form" id="add-demo-form">
+        <h3>Add Demo Manually</h3>
+        <div class="form-grid">
+          <div class="form-full">
+            <label>Name *</label>
+            <input type="text" id="new-demo-name" placeholder="e.g. Voice Agent - Inbound + Outbound">
+          </div>
+          <div class="form-full">
+            <label>Description</label>
+            <input type="text" id="new-demo-desc" placeholder="Brief description of what it does">
+          </div>
+          <div>
+            <label>Demo Type</label>
+            <input type="text" id="new-demo-type" placeholder="e.g. chat_agent, dashboard">
+          </div>
+          <div>
+            <label>Stack</label>
+            <input type="text" id="new-demo-stack" placeholder="e.g. Python + Flask + Railway">
+          </div>
+          <div class="form-full">
+            <label>Deploy URL (optional)</label>
+            <input type="text" id="new-demo-url" placeholder="https://...">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm" onclick="submitNewDemo()">Add Demo</button>
+          <button class="btn-ghost btn-sm" onclick="toggleAddDemoForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail View -->
+    <div class="view" id="view-demo-detail">
+      <div class="back-link" onclick="showDemosList()">&larr; Back to Demos</div>
+      <div id="demo-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- TAB 3: TEAM                                                        -->
+  <!-- ================================================================== -->
+
+  <div class="tab-content" id="tab-team" style="display:none">
+    <div class="view active" id="view-team">
+      <h2 style="font-size:1rem;font-weight:600;color:#141413;margin-bottom:0.5rem;">Team Members</h2>
+      <p class="section-desc">Anyone not in this list is treated as a customer in transcripts.</p>
       <div class="team-list" id="team-list"></div>
       <div class="add-row">
         <input type="text" id="team-name-input" placeholder="Full name" onkeydown="if(event.key==='Enter')addTeamMember()">
@@ -455,112 +789,102 @@
         </label>
       </div>
     </div>
-
-    <div class="settings-section">
-      <h2>Solutions Registry</h2>
-      <p class="desc">Existing demos the pipeline checks before building from scratch.</p>
-      <div id="solutions-table-wrap"></div>
-
-      <div class="sol-form" id="sol-form">
-        <div style="font-size:0.88rem;font-weight:600;color:#fff;margin-bottom:12px;">Add Solution</div>
-        <div class="form-grid">
-          <div class="form-full">
-            <label>Name *</label>
-            <input type="text" id="sol-name" placeholder="e.g. Voice Agent — Inbound + Outbound">
-          </div>
-          <div class="form-full">
-            <label>Description</label>
-            <input type="text" id="sol-description" placeholder="Brief description of what it does">
-          </div>
-          <div>
-            <label>Demo Type</label>
-            <input type="text" id="sol-demo-type" placeholder="e.g. chat_agent, dashboard, pipeline">
-          </div>
-          <div>
-            <label>Stack</label>
-            <input type="text" id="sol-stack" placeholder="e.g. Python + Flask + Railway">
-          </div>
-          <div>
-            <label>Source</label>
-            <select id="sol-source">
-              <option value="manual">Manual (built outside tool)</option>
-              <option value="demo_tool">Demo Tool (auto-deployed)</option>
-            </select>
-          </div>
-          <div class="form-full">
-            <label>Demo URL (optional)</label>
-            <input type="text" id="sol-demo-url" placeholder="https://...">
-          </div>
-          <div class="form-full">
-            <label>Note (optional)</label>
-            <input type="text" id="sol-note" placeholder="Any context for the team">
-          </div>
-        </div>
-        <button class="btn btn-sm" onclick="addSolution()">Add Solution</button>
-      </div>
-      <div class="upload-json-row">
-        <span class="upload-json-label">Or import from JSON:</span>
-        <label class="btn-ghost btn-sm upload-json-btn">
-          Upload solutions.json
-          <input type="file" accept=".json" style="display:none" onchange="uploadSolutionsJson(this)">
-        </label>
-      </div>
-    </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
+// =========================================================================
+// Constants & State
+// =========================================================================
 const STAGES = [
-  { id: 1, name: "Stage 1 — Understand" },
-  { id: 2, name: "Stage 2 — Design" },
-  { id: 3, name: "Stage 3 — Build" },
-  { id: 4, name: "Stage 4 — Guide" },
+  { id: 1, name: "Stage 1 -- Understand" },
+  { id: 2, name: "Stage 2 -- Design" },
+  { id: 3, name: "Stage 3 -- Build" },
+  { id: 4, name: "Stage 4 -- Deploy" },
 ];
 
 let sessionId = null;
 let mode = "verbose";
 let eventSource = null;
 let stageResults = {};
+let _teamList = [];
+let _demosCache = [];
+let _currentTab = "create";
 
-// Restore session from URL on load, otherwise show recent sessions list
+// =========================================================================
+// Init
+// =========================================================================
 window.addEventListener("load", () => {
   const params = new URLSearchParams(window.location.search);
   const sid = params.get("session");
+  const demoId = params.get("demo");
   const view = params.get("view");
-  if (view === "settings") {
-    showSettings();
+
+  if (sid && view === "sessions") {
+    switchTab("sessions", true);
+    showSessionDetail(sid);
   } else if (sid) {
+    switchTab("create", true);
     restoreSession(sid);
+  } else if (demoId) {
+    switchTab("demos", true);
+    showDemoDetail(demoId);
+  } else if (view === "sessions") {
+    switchTab("sessions", true);
+  } else if (view === "demos" || view === "library") {
+    switchTab("demos", true);
+  } else if (view === "team") {
+    switchTab("team", true);
   } else {
-    loadRecentSessions();
+    switchTab("create", true);
   }
 });
 
-async function loadRecentSessions() {
-  try {
-    const res = await fetch("/sessions");
-    const sessions = await res.json();
-    if (!sessions.length) return;
-    const container = document.getElementById("recent-sessions");
-    const list = document.getElementById("sessions-list");
-    list.innerHTML = sessions.map(s => {
-      const badgeClass = {running:"badge-running", done:"badge-done", error:"badge-error",
-        waiting_continue:"badge-waiting", waiting_input:"badge-waiting", idle:"badge-idle"}[s.status] || "badge-idle";
-      const label = {running:"● running", done:"✓ done", error:"✗ error",
-        waiting_continue:"⏸ waiting", waiting_input:"⏸ needs input", idle:"idle"}[s.status] || s.status;
-      const stage = s.current_stage > 0 ? `Stage ${s.current_stage}/4` : "Not started";
-      const ago = s.updated_at ? timeAgo(s.updated_at) : "";
-      return `<div class="session-row" onclick="window.location='?session=${s.session_id}'">
-        <span class="session-company">${escapeHtml(s.company || "Unknown")}</span>
-        <span class="session-badge ${badgeClass}">${label}</span>
-        <span class="session-meta">${stage}</span>
-        <span class="session-meta">${ago}</span>
-      </div>`;
-    }).join("");
-    container.style.display = "block";
-  } catch(e) { /* silently ignore */ }
+// =========================================================================
+// Tab Navigation
+// =========================================================================
+function switchTab(tab, skipPush) {
+  _currentTab = tab;
+
+  // Update tab styles
+  document.querySelectorAll(".tab-nav .tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.tab === tab);
+  });
+
+  // Show/hide tab content
+  document.querySelectorAll(".tab-content").forEach(tc => {
+    tc.style.display = "none";
+  });
+  const container = document.getElementById("app-container");
+  const tabEl = document.getElementById(`tab-${tab}`);
+  if (tabEl) tabEl.style.display = "block";
+
+  // Wide container for sessions and demos
+  container.classList.toggle("wide", tab === "sessions" || tab === "demos");
+
+  // Load data
+  if (tab === "sessions") loadSessions();
+  if (tab === "demos") loadDemos();
+  if (tab === "team") loadTeam();
+
+  // Update URL
+  if (!skipPush) {
+    if (tab === "create") {
+      history.replaceState(null, "", window.location.pathname);
+    } else {
+      history.replaceState(null, "", `?view=${tab}`);
+    }
+  }
+}
+
+// =========================================================================
+// Utility
+// =========================================================================
+function escapeHtml(s) {
+  if (typeof s !== "string") return "";
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
 function timeAgo(iso) {
@@ -572,18 +896,25 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
-// ---------------------------------------------------------------------------
-// View switching
-// ---------------------------------------------------------------------------
-function showView(id) {
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("visible");
+  setTimeout(() => t.classList.remove("visible"), 2000);
+}
+
+// =========================================================================
+// CREATE DEMO — View switching
+// =========================================================================
+function showCreateView(id) {
+  document.querySelectorAll("#tab-create .view").forEach(v => v.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 }
 
 function resetToUpload() {
   sessionId = null;
   if (eventSource) eventSource.close();
-  showView("view-upload");
+  showCreateView("view-upload");
   history.replaceState(null, "", window.location.pathname);
 }
 
@@ -594,9 +925,9 @@ function selectMode(m) {
   document.getElementById("email-row").style.display = m === "auto" ? "block" : "none";
 }
 
-// ---------------------------------------------------------------------------
+// =========================================================================
 // Upload
-// ---------------------------------------------------------------------------
+// =========================================================================
 const dropZone = document.getElementById("drop-zone");
 const fileInput = document.getElementById("file-input");
 
@@ -619,14 +950,14 @@ async function handleFile(file) {
     const data = await res.json();
     sessionId = data.session_id;
     document.getElementById("file-name-display").textContent = file.name;
-    showView("view-mode");
+    showCreateView("view-mode");
     history.replaceState(null, "", `?session=${sessionId}`);
   } catch (e) { alert("Upload error: " + e.message); }
 }
 
-// ---------------------------------------------------------------------------
+// =========================================================================
 // Start pipeline
-// ---------------------------------------------------------------------------
+// =========================================================================
 async function startPipeline() {
   const email = document.getElementById("email-input").value.trim();
   const additional_context = document.getElementById("context-input").value.trim();
@@ -638,16 +969,16 @@ async function startPipeline() {
   if (!res.ok) { const e = await res.json(); alert(e.detail || "Start failed"); return; }
 
   initPipelineView();
-  showView("view-pipeline");
+  showCreateView("view-pipeline");
   connectSSE();
 }
 
-// ---------------------------------------------------------------------------
+// =========================================================================
 // Pipeline view
-// ---------------------------------------------------------------------------
+// =========================================================================
 function initPipelineView() {
   document.getElementById("pipeline-company").textContent = "Running pipeline...";
-  document.getElementById("pipeline-mode-tag").textContent = mode === "verbose" ? "Verbose mode — you control each stage" : "Auto mode — running to completion";
+  document.getElementById("pipeline-mode-tag").textContent = mode === "verbose" ? "Verbose mode -- you control each stage" : "Auto mode -- running to completion";
   document.getElementById("action-area").innerHTML = "";
   document.getElementById("log-list").innerHTML = "";
   stageResults = {};
@@ -656,10 +987,10 @@ function initPipelineView() {
   list.innerHTML = STAGES.map(s => `
     <div class="stage" id="stage-${s.id}"${s.id > 1 ? ' style="display:none"' : ''}>
       <div class="stage-header" onclick="toggleStage(${s.id})">
-        <div class="stage-icon pending" id="icon-${s.id}">—</div>
+        <div class="stage-icon pending" id="icon-${s.id}">-</div>
         <div class="stage-name">${s.name}</div>
         <div class="stage-time" id="time-${s.id}"></div>
-        <div class="stage-chevron">▶</div>
+        <div class="stage-chevron">&rsaquo;</div>
       </div>
       <div class="stage-body" onclick="event.stopPropagation()">
         <div class="stage-body-header">
@@ -691,10 +1022,10 @@ function setStageState(id, state) {
   const icon = document.getElementById(`icon-${id}`);
   el.classList.remove("active", "done", "error");
   icon.classList.remove("pending", "running", "done", "error");
-  if (state === "running") { el.classList.add("active"); icon.classList.add("running"); icon.textContent = "⟳"; }
-  if (state === "done") { el.classList.add("done"); icon.classList.add("done"); icon.textContent = "✓"; }
-  if (state === "error") { el.classList.add("error"); icon.classList.add("error"); icon.textContent = "✗"; }
-  if (state === "skipped") { el.classList.add("done"); icon.classList.add("done"); icon.textContent = "–"; }
+  if (state === "running") { el.classList.add("active"); icon.classList.add("running"); icon.textContent = "~"; }
+  if (state === "done") { el.classList.add("done"); icon.classList.add("done"); icon.textContent = "ok"; }
+  if (state === "error") { el.classList.add("error"); icon.classList.add("error"); icon.textContent = "x"; }
+  if (state === "skipped") { el.classList.add("done"); icon.classList.add("done"); icon.textContent = "-"; }
 }
 
 function setStageOutput(id, content) {
@@ -707,7 +1038,7 @@ function setStageOutput(id, content) {
 function addLog(msg) {
   const el = document.createElement("div");
   el.className = "log-entry";
-  el.textContent = `${new Date().toLocaleTimeString()} — ${msg}`;
+  el.textContent = `${new Date().toLocaleTimeString()} -- ${msg}`;
   document.getElementById("log-list").prepend(el);
 }
 
@@ -715,12 +1046,12 @@ function toggleLogs() {
   const el = document.getElementById("log-list");
   const toggle = document.querySelector(".log-toggle");
   const visible = el.classList.toggle("visible");
-  toggle.textContent = (visible ? "▼" : "▶") + " Show logs";
+  toggle.textContent = (visible ? "v" : ">") + " Show logs";
 }
 
-// ---------------------------------------------------------------------------
+// =========================================================================
 // SSE
-// ---------------------------------------------------------------------------
+// =========================================================================
 function connectSSE() {
   if (eventSource) eventSource.close();
   eventSource = new EventSource(`/stream/${sessionId}`);
@@ -737,17 +1068,14 @@ function connectSSE() {
     setStageState(id, data.skipped ? "skipped" : "done");
     if (data.result && !data.skipped) setStageOutput(id, data.result);
 
-    // Update company name from classifier
     if (id === 1 && data.result && data.result.customer) {
       const c = data.result.customer;
       document.getElementById("pipeline-company").textContent =
         `${c.name || ""} @ ${c.company || ""}`.trim();
     }
 
-    // Remove inline continue panel if present
     document.getElementById("continue-panel")?.remove();
 
-    // Reveal and mark next stage as running
     if (id < 4 && !data.skipped) {
       const nextEl = document.getElementById(`stage-${id + 1}`);
       if (nextEl) nextEl.style.display = "";
@@ -761,11 +1089,24 @@ function connectSSE() {
     if (data.reason === "input") showInputPanel(data.items);
   });
 
+  eventSource.addEventListener("matched", e => {
+    const data = JSON.parse(e.data);
+    eventSource.close();
+    // Hide stages 2-4 since pipeline stopped early
+    STAGES.forEach(s => {
+      const el = document.getElementById(`stage-${s.id}`);
+      const icon = el?.querySelector(".stage-icon");
+      if (icon && (icon.classList.contains("running") || icon.classList.contains("pending"))) {
+        el.style.display = "none";
+      }
+    });
+    showMatchPanel(data);
+  });
+
   eventSource.addEventListener("done", e => {
     const data = JSON.parse(e.data);
     eventSource.close();
     document.getElementById("continue-panel")?.remove();
-    // Hide any stages that never ran
     STAGES.forEach(s => {
       const el = document.getElementById(`stage-${s.id}`);
       const icon = el?.querySelector(".stage-icon");
@@ -779,14 +1120,14 @@ function connectSSE() {
   eventSource.addEventListener("error", e => {
     const data = JSON.parse(e.data);
     document.getElementById("action-area").innerHTML = `
-      <div class="error-panel">❌ ${data.message}</div>`;
+      <div class="error-panel">Error: ${data.message}</div>`;
     eventSource.close();
   });
 }
 
-// ---------------------------------------------------------------------------
+// =========================================================================
 // Action panels
-// ---------------------------------------------------------------------------
+// =========================================================================
 function showContinuePanel(label) {
   const stageNum = (label || "").match(/Stage (\d+)/)?.[1];
   const completedNum = stageNum ? parseInt(stageNum) : null;
@@ -797,8 +1138,8 @@ function showContinuePanel(label) {
   panel.id = "continue-panel";
   panel.className = "continue-inline";
   panel.innerHTML = `
-    <p>Stage ${completedNum} complete — <strong>${label || "ready"}</strong></p>
-    <button class="btn" onclick="sendContinue()">Continue to Stage ${nextNum} →</button>`;
+    <p>Stage ${completedNum} complete -- <strong>${label || "ready"}</strong></p>
+    <button class="btn" onclick="sendContinue()">Continue to Stage ${nextNum}</button>`;
 
   const completedCard = completedNum
     ? document.getElementById(`stage-${completedNum}`)
@@ -834,7 +1175,7 @@ function showInputPanel(items) {
       <h3>Customer inputs needed</h3>
       <p>Enter values provided by the customer. Leave blank to build with mock data.</p>
       <div class="input-items">${itemsHtml}</div>
-      <button class="btn" onclick="submitInputs(${items.length})">Submit & Continue Building →</button>
+      <button class="btn" onclick="submitInputs(${items.length})">Submit & Continue Building</button>
     </div>`;
 }
 
@@ -853,19 +1194,51 @@ async function submitInputs(count) {
   });
 }
 
+function showMatchPanel(data) {
+  const area = document.getElementById("action-area");
+  let urlHtml = "";
+  if (data.deploy_url) {
+    urlHtml = `<div class="deploy-link" style="margin-top:12px"><a href="${data.deploy_url}" target="_blank">Open Existing Demo</a></div>`;
+  }
+  let demoLink = "";
+  if (data.solution_id) {
+    demoLink = `<div style="margin-top:10px"><span class="nav-chip" onclick="switchTab('demos');showDemoDetail('${data.solution_id}')">View in Demo Library</span></div>`;
+  }
+  area.innerHTML = `
+    <div class="done-panel" style="border-left:4px solid #d97757;">
+      <h2 style="color:#d97757">Match Found</h2>
+      <p style="font-size:1rem;font-weight:600;margin:8px 0">${escapeHtml(data.solution_name || "Existing solution")}</p>
+      <p style="font-size:0.85rem;color:#666;margin:4px 0">${escapeHtml(data.match_reasoning || "")}</p>
+      ${urlHtml}
+      ${demoLink}
+    </div>`;
+}
+
 function showDonePanel(data) {
   const area = document.getElementById("action-area");
-  const urlHtml = data.deploy_url
-    ? `<div class="deploy-link"><a href="${data.deploy_url}" target="_blank">🚀 Open Live Demo →</a></div>`
-    : `<p style="color:#666;font-size:0.85rem">No deploy URL.</p>
-       <button class="btn" id="redeploy-btn" onclick="redeploySession()" style="margin-top:0.5rem">↺ Retry Deploy</button>
+  let urlHtml;
+  if (data.deploy_url) {
+    const statusBadge = data.verified === false
+      ? `<span class="session-badge badge-deploy-failed" style="margin-left:0.5rem">health check failed</span>`
+      : `<span class="session-badge badge-verified" style="margin-left:0.5rem">verified</span>`;
+    urlHtml = `<div class="deploy-link"><a href="${data.deploy_url}" target="_blank">Open Live Demo</a>${statusBadge}</div>`;
+    if (data.verified === false) {
+      urlHtml += `<div style="margin-top:0.5rem">
+        <button class="btn" id="redeploy-btn" onclick="redeploySession()">Retry Deploy</button>
+        <span id="redeploy-status" style="margin-left:0.75rem;font-size:0.85rem;color:#888"></span>
+      </div>`;
+    }
+  } else {
+    urlHtml = `<p style="color:#666;font-size:0.85rem">No deploy URL.</p>
+       <button class="btn" id="redeploy-btn" onclick="redeploySession()" style="margin-top:0.5rem">Retry Deploy</button>
        <span id="redeploy-status" style="margin-left:0.75rem;font-size:0.85rem;color:#888"></span>`;
+  }
   const guideHtml = data.guide
     ? `<div class="guide-box"><h3>Demo Guide</h3><pre class="output">${escapeHtml(data.guide)}</pre></div>`
     : "";
   area.innerHTML = `
     <div class="done-panel">
-      <h2>✓ Pipeline complete</h2>
+      <h2>Pipeline complete</h2>
       ${urlHtml}
       ${guideHtml}
     </div>`;
@@ -875,7 +1248,7 @@ async function redeploySession() {
   const btn = document.getElementById("redeploy-btn");
   const status = document.getElementById("redeploy-status");
   btn.disabled = true;
-  btn.textContent = "Deploying…";
+  btn.textContent = "Deploying...";
   status.textContent = "";
   try {
     const res = await fetch(`/redeploy/${sessionId}`, { method: "POST" });
@@ -883,51 +1256,713 @@ async function redeploySession() {
     if (!res.ok) throw new Error(data.detail || "Deploy failed");
     btn.style.display = "none";
     status.style.display = "none";
+    const statusBadge = data.verified
+      ? `<span class="session-badge badge-verified" style="margin-left:0.5rem">verified</span>`
+      : `<span class="session-badge badge-deploy-failed" style="margin-left:0.5rem">health check failed</span>`;
     document.querySelector(".done-panel").insertAdjacentHTML("afterbegin",
-      `<div class="deploy-link"><a href="${data.deploy_url}" target="_blank">🚀 Open Live Demo →</a></div>`);
+      `<div class="deploy-link"><a href="${data.deploy_url}" target="_blank">Open Live Demo</a>${statusBadge}</div>`);
+    if (!data.verified) {
+      document.querySelector(".done-panel").insertAdjacentHTML("beforeend",
+        `<div style="margin-top:0.5rem">
+          <button class="btn" id="redeploy-btn" onclick="redeploySession()">Retry Deploy</button>
+          <span id="redeploy-status" style="margin-left:0.75rem;font-size:0.85rem;color:#888"></span>
+        </div>`);
+    }
   } catch(e) {
     btn.disabled = false;
-    btn.textContent = "↺ Retry Deploy";
+    btn.textContent = "Retry Deploy";
     status.textContent = `Error: ${e.message}`;
     status.style.color = "#e57373";
   }
 }
 
-function escapeHtml(s) {
-  if (typeof s !== "string") return "";
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+// =========================================================================
+// Restore session (page reload)
+// =========================================================================
+async function restoreSession(sid) {
+  try {
+    const res = await fetch(`/session/${sid}`);
+    if (!res.ok) return;
+    const session = await res.json();
+    sessionId = sid;
+
+    initPipelineView();
+    showCreateView("view-pipeline");
+    document.getElementById("pipeline-mode-tag").textContent =
+      session.mode === "verbose" ? "Verbose mode" : "Auto mode";
+
+    const stageKeys = ["stage_1_understand","stage_2_design","stage_3_demo","stage_4_guide"];
+    stageKeys.forEach((key, i) => {
+      const id = i + 1;
+      const result = session[key];
+      if (result) {
+        const el = document.getElementById(`stage-${id}`);
+        if (el) el.style.display = "";
+        setStageState(id, "done");
+        setStageOutput(id, id === 3 ? "(demo code -- see output file)" : result);
+      }
+    });
+
+    if (session.status === "done") {
+      // Check if this was a solution match (no design stage = early exit)
+      const match = session.stage_1_understand?.existing_solution_match;
+      if (match?.matched && !session.stage_2_design) {
+        showMatchPanel({
+          solution_name: match.solution_name,
+          solution_id: match.solution_id,
+          deploy_url: match.deploy_url,
+          match_reasoning: match.match_reasoning,
+        });
+      } else {
+        showDonePanel({
+          deploy_url: session.deploy_url,
+          guide: session.stage_4_guide,
+          verified: session.health_check_passed,
+        });
+      }
+    } else if (["running","waiting_continue","waiting_input","verifying","deploying"].includes(session.status)) {
+      connectSSE();
+      if (session.status === "waiting_input") {
+        const understand = session.stage_1_understand;
+        const askItems = understand && understand.dependencies && understand.dependencies.ask_customer;
+        if (askItems) showInputPanel(askItems);
+      }
+    }
+
+    if (session.stage_1_understand) {
+      const c = session.stage_1_understand.customer || {};
+      document.getElementById("pipeline-company").textContent =
+        `${c.name || ""} @ ${c.company || ""}`.trim();
+    }
+  } catch(e) {
+    console.warn("Could not restore session:", e);
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Settings
-// ---------------------------------------------------------------------------
-let _teamList = [];
-
-function showSettings() {
-  showView("view-settings");
-  document.getElementById("nav-settings").textContent = "Back";
-  document.getElementById("nav-settings").setAttribute("onclick", "hideSettings()");
-  history.replaceState(null, "", "?view=settings");
-  loadTeam();
-  loadSolutions();
+// =========================================================================
+// DEMO LIBRARY
+// =========================================================================
+async function loadDemos() {
+  try {
+    const res = await fetch("/api/demos");
+    const all = await res.json();
+    // Only show demos that have a deploy URL or were manually added
+    _demosCache = all.filter(d => d.deploy_url || d.source === "manual");
+    renderDemoList();
+  } catch(e) {
+    console.warn("Could not load demos:", e);
+  }
 }
 
-function hideSettings() {
-  showView("view-upload");
-  document.getElementById("nav-settings").textContent = "Settings";
-  document.getElementById("nav-settings").setAttribute("onclick", "showSettings()");
-  history.replaceState(null, "", window.location.pathname);
-  loadRecentSessions();
+function getDeployStatus(d) {
+  if (d.deploy_url && d.health_check_passed) return "verified";
+  if (d.deploy_url && !d.health_check_passed) return "failed";
+  return "not_deployed";
 }
 
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("visible");
-  setTimeout(() => t.classList.remove("visible"), 2000);
+function renderDemoList() {
+  const filtered = getFilteredDemos();
+  const wrap = document.getElementById("demo-table-wrap");
+
+  if (!filtered.length) {
+    wrap.innerHTML = `<div class="empty-state">${_demosCache.length ? "No demos match your filters." : "No demos yet. Create one or add manually."}</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `<table class="demo-table">
+    <thead><tr>
+      <th>Name</th>
+      <th>Company</th>
+      <th>Type</th>
+      <th>Status</th>
+      <th>URL</th>
+      <th>Created</th>
+    </tr></thead>
+    <tbody>${filtered.map(d => {
+      const status = getDeployStatus(d);
+      const badgeClass = { verified: "badge-verified", failed: "badge-deploy-failed", not_deployed: "badge-not-deployed" }[status];
+      const badgeLabel = { verified: "verified", failed: "failed", not_deployed: "not deployed" }[status];
+      const registryBadge = d.is_reusable ? ` <span class="badge-registry">registry</span>` : "";
+      return `<tr onclick="showDemoDetail('${d.id}')">
+        <td><span class="demo-name">${escapeHtml(d.name || "Untitled")}</span>${registryBadge}</td>
+        <td>${escapeHtml(d.company || "-")}</td>
+        <td>${escapeHtml(d.demo_type || "-")}</td>
+        <td><span class="session-badge ${badgeClass}">${badgeLabel}</span></td>
+        <td>${d.deploy_url ? `<a href="${d.deploy_url}" target="_blank" onclick="event.stopPropagation()" style="color:#5b6af0;font-size:0.78rem;">Open</a>` : "-"}</td>
+        <td style="font-size:0.78rem;color:#b0aea5;white-space:nowrap;">${d.created_at ? timeAgo(d.created_at) : "-"}</td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
 }
 
-// Team
+function getFilteredDemos() {
+  const search = document.getElementById("filter-search").value.toLowerCase();
+  const type = document.getElementById("filter-type").value;
+  const status = document.getElementById("filter-status").value;
+  const source = document.getElementById("filter-source").value;
+
+  return _demosCache.filter(d => {
+    if (search) {
+      const haystack = `${d.name || ""} ${d.company || ""} ${d.description || ""} ${d.contact_name || ""}`.toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    if (type && d.demo_type !== type) return false;
+    if (source && d.source !== source) return false;
+    if (status) {
+      const ds = getDeployStatus(d);
+      if (ds !== status) return false;
+    }
+    return true;
+  });
+}
+
+function filterDemos() {
+  renderDemoList();
+}
+
+function toggleAddDemoForm() {
+  document.getElementById("add-demo-form").classList.toggle("visible");
+}
+
+async function submitNewDemo() {
+  const name = document.getElementById("new-demo-name").value.trim();
+  if (!name) { alert("Name is required"); return; }
+  const body = {
+    name,
+    description: document.getElementById("new-demo-desc").value.trim() || undefined,
+    demo_type: document.getElementById("new-demo-type").value.trim() || undefined,
+    stack: document.getElementById("new-demo-stack").value.trim() || undefined,
+    demo_url: document.getElementById("new-demo-url").value.trim() || undefined,
+  };
+  try {
+    const res = await fetch("/api/solutions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) { const e = await res.json(); alert(e.detail || "Error"); return; }
+    showToast(`Added ${name}`);
+    ["new-demo-name","new-demo-desc","new-demo-type","new-demo-stack","new-demo-url"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("add-demo-form").classList.remove("visible");
+    loadDemos();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+// =========================================================================
+// Demo Detail
+// =========================================================================
+function showDemosView(id) {
+  document.querySelectorAll("#tab-demos .view").forEach(v => v.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+function showDemosList() {
+  document.querySelectorAll("#tab-demos .view").forEach(v => v.classList.remove("active"));
+  document.getElementById("view-demos").classList.add("active");
+  history.replaceState(null, "", "?view=demos");
+}
+
+async function showDemoDetail(demoId) {
+  showDemosView("view-demo-detail");
+  history.replaceState(null, "", `?demo=${demoId}&view=demos`);
+
+  const content = document.getElementById("demo-detail-content");
+  content.innerHTML = `<div class="empty-state">Loading...</div>`;
+
+  try {
+    const demoRes = await fetch(`/api/demos/${demoId}`);
+    if (!demoRes.ok) {
+      content.innerHTML = `<div class="error-panel">Demo not found</div>`;
+      return;
+    }
+
+    const demo = await demoRes.json();
+    const demoSessions = demo.sessions || [];
+
+    const status = getDeployStatus(demo);
+    const badgeClass = { verified: "badge-verified", failed: "badge-deploy-failed", not_deployed: "badge-not-deployed" }[status];
+    const badgeLabel = { verified: "verified", failed: "failed", not_deployed: "not deployed" }[status];
+
+    const keywords = demo.keywords || [];
+    const skills = demo.skills_used || [];
+
+    // === Header ===
+    let html = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
+        <div class="detail-title">${escapeHtml(demo.name || "Untitled Demo")}</div>
+        <span class="session-badge ${badgeClass}">${badgeLabel}</span>
+        <span class="session-badge badge-idle">${demo.source || "web"}</span>
+      </div>
+      <div style="margin-bottom:20px;"></div>`;
+
+    // =============================================================
+    // SECTION 1: TRANSCRIPT
+    // =============================================================
+    html += `<div class="detail-card"><h3>Transcript</h3>`;
+
+    if (demo.session_id) {
+      html += `<div class="detail-grid">`;
+      if (demo.company) html += `<div><span class="meta-label">Company</span><span class="meta-val">${escapeHtml(demo.company)}</span></div>`;
+      if (demo.contact_name) html += `<div><span class="meta-label">Contact</span><span class="meta-val">${escapeHtml(demo.contact_name)}</span></div>`;
+      if (demo.contact_email) html += `<div><span class="meta-label">Email</span><span class="meta-val"><a href="mailto:${escapeHtml(demo.contact_email)}">${escapeHtml(demo.contact_email)}</a></span></div>`;
+      if (demo.industry) html += `<div><span class="meta-label">Industry</span><span class="meta-val">${escapeHtml(demo.industry)}</span></div>`;
+      if (demo.transcript_source) html += `<div><span class="meta-label">Source</span><span class="meta-val">${escapeHtml(demo.transcript_source)}</span></div>`;
+      if (demo.transcript_created_at) html += `<div><span class="meta-label">Uploaded</span><span class="meta-val">${new Date(demo.transcript_created_at).toLocaleDateString()}</span></div>`;
+      html += `</div>`;
+
+      if (demo.meeting_link) {
+        html += `<div style="margin-top:12px;"><div class="link-row">
+          <span class="link-label">Meeting</span>
+          <a href="${demo.meeting_link}" target="_blank">${demo.meeting_link}</a>
+        </div></div>`;
+      }
+
+      if (demo.additional_context) {
+        html += `<div style="margin-top:12px;">
+          <span class="meta-label" style="font-size:0.68rem;color:#b0aea5;text-transform:uppercase;letter-spacing:0.05em;font-family:Roboto,sans-serif;font-weight:600;display:block;margin-bottom:4px;">Additional Context</span>
+          <div style="font-size:0.85rem;color:#4a4845;background:#faf9f5;border:1px solid #e8e6dc;border-radius:6px;padding:10px 12px;">${escapeHtml(demo.additional_context)}</div>
+        </div>`;
+      }
+
+      if (demo.transcript_content) {
+        html += `<details style="margin-top:12px;">
+          <summary style="font-size:0.78rem;color:#b0aea5;cursor:pointer;font-family:Roboto,sans-serif;font-weight:500;">Show full transcript</summary>
+          <pre class="output" style="margin-top:6px;max-height:300px;">${escapeHtml(demo.transcript_content)}</pre>
+        </details>`;
+      }
+    } else {
+      html += `<div style="color:#b0aea5;font-size:0.85rem;">No transcript -- this demo was added manually.</div>`;
+    }
+
+    html += `</div>`;
+
+    // =============================================================
+    // SECTION 2: DEMO
+    // =============================================================
+    html += `<div class="detail-card"><h3>Demo</h3>`;
+
+    if (demo.description) {
+      html += `<div class="detail-desc">${escapeHtml(demo.description)}</div>`;
+    }
+
+    html += `<div class="detail-grid">
+      <div><span class="meta-label">Type</span><span class="meta-val">${escapeHtml(demo.demo_type || "-")}</span></div>
+      <div><span class="meta-label">Use Case</span><span class="meta-val">${escapeHtml(demo.use_case || "-")}</span></div>
+      <div><span class="meta-label">Stack</span><span class="meta-val">${escapeHtml(demo.stack || "-")}</span></div>
+      <div><span class="meta-label">Created</span><span class="meta-val">${demo.created_at ? new Date(demo.created_at).toLocaleDateString() : "-"}</span></div>
+      ${keywords.length ? `<div class="full"><span class="meta-label">Keywords</span><div class="chip-list">${keywords.map(k => `<span class="chip">${escapeHtml(k)}</span>`).join("")}</div></div>` : ""}
+      ${skills.length ? `<div class="full"><span class="meta-label">Skills Used</span><div class="chip-list">${skills.map(s => `<span class="chip">${escapeHtml(s)}</span>`).join("")}</div></div>` : ""}
+    </div>`;
+
+    // Deployment sub-section
+    html += `<div style="margin-top:20px;padding-top:16px;border-top:1px solid #e8e6dc;">
+      <span class="meta-label" style="font-size:0.72rem;color:#b0aea5;text-transform:uppercase;letter-spacing:0.07em;font-family:Roboto,sans-serif;font-weight:600;display:block;margin-bottom:10px;">Deployment</span>`;
+
+    if (demo.deploy_url) {
+      html += `<div class="link-row">
+        <span class="link-label">Live URL</span>
+        <a href="${demo.deploy_url}" target="_blank">${demo.deploy_url}</a>
+        <span class="link-badge"><span class="session-badge ${badgeClass}">${badgeLabel}</span></span>
+      </div>`;
+    } else {
+      html += `<div class="link-row"><span class="link-label">Live URL</span><span style="color:#b0aea5;">Not deployed</span></div>`;
+    }
+
+    if (demo.github_repo) {
+      const ghUrl = demo.github_repo.startsWith("http") ? demo.github_repo : `https://github.com/${demo.github_repo}`;
+      html += `<div class="link-row">
+        <span class="link-label">GitHub</span>
+        <a href="${ghUrl}" target="_blank">${demo.github_repo}</a>
+      </div>`;
+    } else {
+      html += `<div class="link-row">
+        <span class="link-label">GitHub</span>
+        <span style="color:#b0aea5">Not linked</span>
+      </div>`;
+    }
+
+    if (demo.railway_project_id) {
+      const railwayUrl = `https://railway.com/project/${demo.railway_project_id}`;
+      html += `<div class="link-row">
+        <span class="link-label">Railway</span>
+        <a href="${railwayUrl}" target="_blank">${railwayUrl}</a>
+      </div>`;
+    }
+
+    html += `<div class="detail-actions" style="margin-top:16px;">
+      <button class="btn-ghost btn-sm" style="color:#991b1b;border-color:#991b1b;" onclick="deleteDemo('${demoId}')">Delete Demo</button>
+    </div>`;
+
+    html += `</div></div>`;
+
+    // =============================================================
+    // SECTION 3: LINKED SESSION
+    // =============================================================
+    html += `<div class="detail-card"><h3>Linked Session</h3>`;
+
+    if (demo.session_id) {
+      const s = demoSessions.length ? demoSessions[0] : null;
+      if (s) {
+        const sBadgeClass = {running:"badge-running", done:"badge-done", error:"badge-error",
+          waiting_continue:"badge-waiting", waiting_input:"badge-waiting", idle:"badge-idle",
+          deploying:"badge-deploying", verifying:"badge-verifying"}[s.status] || "badge-idle";
+        const sLabel = {running:"running", done:"done", error:"error",
+          waiting_continue:"waiting", waiting_input:"needs input", idle:"idle",
+          deploying:"deploying", verifying:"verifying"}[s.status] || s.status;
+
+        html += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span class="session-badge ${sBadgeClass}">${sLabel}</span>
+          <span style="font-size:0.82rem;color:#4a4845;">Stage ${s.current_stage || 0}/4 &middot; ${s.mode || "auto"} mode</span>
+          <span style="font-size:0.78rem;color:#b0aea5;">${s.updated_at ? timeAgo(s.updated_at) : ""}</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;">
+          <span class="nav-chip" onclick="switchTab('sessions');showSessionDetail('${demo.session_id}')">View in Sessions</span>
+          <span class="nav-chip" onclick="navigateToSession('${demo.session_id}')">Open in Pipeline View</span>
+        </div>`;
+      } else {
+        html += `<div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:0.82rem;color:#4a4845;">Session: ${demo.session_id.slice(0,8)}...</span>
+          <span class="nav-chip" onclick="switchTab('sessions');showSessionDetail('${demo.session_id}')">View in Sessions</span>
+        </div>`;
+      }
+    } else {
+      html += `<div style="color:#b0aea5;font-size:0.85rem;">No linked session — this demo was added manually.</div>`;
+    }
+
+    html += `</div>`;
+
+    content.innerHTML = html;
+  } catch(e) {
+    content.innerHTML = `<div class="error-panel">Error loading demo: ${e.message}</div>`;
+  }
+}
+
+async function toggleSessionCard(sid) {
+  const card = document.getElementById(`scard-${sid}`);
+  const body = document.getElementById(`sbody-${sid}`);
+  const wasExpanded = card.classList.contains("expanded");
+  card.classList.toggle("expanded");
+
+  // Load details on first expand
+  if (!wasExpanded && body.dataset.loaded !== "1") {
+    body.innerHTML = `<div class="empty-state" style="padding:12px;">Loading...</div>`;
+    try {
+      const res = await fetch(`/session/${sid}`);
+      if (!res.ok) throw new Error("Failed to load session");
+      const session = await res.json();
+      body.dataset.loaded = "1";
+
+      let detailHtml = "";
+
+      // Error
+      if (session.error) {
+        detailHtml += `<div class="session-debug-section">
+          <div class="session-debug-label">Error</div>
+          <div class="error-panel" style="margin-top:0;">${escapeHtml(session.error)}</div>
+        </div>`;
+      }
+
+      // Stage 1 — Understand
+      if (session.stage_1_understand) {
+        const u = session.stage_1_understand;
+        const customer = u.customer || {};
+        detailHtml += `<div class="session-debug-section">
+          <div class="session-debug-label">Stage 1 -- Understand</div>
+          <div class="detail-grid" style="margin-bottom:8px;">
+            <div><span class="meta-label">Company</span><span class="meta-val">${escapeHtml(customer.company || "-")}</span></div>
+            <div><span class="meta-label">Contact</span><span class="meta-val">${escapeHtml(customer.name || "-")}</span></div>
+            <div><span class="meta-label">Industry</span><span class="meta-val">${escapeHtml(customer.industry || "-")}</span></div>
+            <div><span class="meta-label">Demo Type</span><span class="meta-val">${escapeHtml(u.demo_type || "-")}</span></div>
+          </div>
+          <details style="margin-top:4px;">
+            <summary style="font-size:0.75rem;color:#b0aea5;cursor:pointer;">Raw JSON</summary>
+            <pre class="output" style="margin-top:4px;max-height:200px;">${escapeHtml(JSON.stringify(u, null, 2))}</pre>
+          </details>
+        </div>`;
+      }
+
+      // Stage 2 — Design
+      if (session.stage_2_design) {
+        const d = session.stage_2_design;
+        const spec = d.demo_spec || d;
+        detailHtml += `<div class="session-debug-section">
+          <div class="session-debug-label">Stage 2 -- Design</div>
+          <div class="detail-grid" style="margin-bottom:8px;">
+            <div><span class="meta-label">Name</span><span class="meta-val">${escapeHtml(spec.name || "-")}</span></div>
+            <div><span class="meta-label">Stack</span><span class="meta-val">${escapeHtml(spec.stack || "-")}</span></div>
+            <div class="full"><span class="meta-label">Description</span><span class="meta-val">${escapeHtml(spec.description || "-")}</span></div>
+          </div>
+          <details style="margin-top:4px;">
+            <summary style="font-size:0.75rem;color:#b0aea5;cursor:pointer;">Raw JSON</summary>
+            <pre class="output" style="margin-top:4px;max-height:200px;">${escapeHtml(JSON.stringify(d, null, 2))}</pre>
+          </details>
+        </div>`;
+      }
+
+      // Stage 3 — Build
+      if (session.stage_3_demo !== undefined && session.stage_3_demo !== null) {
+        detailHtml += `<div class="session-debug-section">
+          <div class="session-debug-label">Stage 3 -- Build</div>
+          <p style="font-size:0.82rem;color:#4a4845;">Code generated (${(session.stage_3_demo || "").length} chars)</p>
+        </div>`;
+      }
+
+      // Stage 4 — Deploy
+      if (session.stage_4_guide) {
+        detailHtml += `<div class="session-debug-section">
+          <div class="session-debug-label">Stage 4 -- Deploy</div>
+          <details>
+            <summary style="font-size:0.75rem;color:#b0aea5;cursor:pointer;">Show guide</summary>
+            <pre class="output" style="margin-top:4px;max-height:200px;">${escapeHtml(session.stage_4_guide)}</pre>
+          </details>
+        </div>`;
+      }
+
+      // Logs
+      const logs = session.logs || [];
+      if (logs.length) {
+        detailHtml += `<div class="session-debug-section">
+          <div class="session-debug-label">Logs (${logs.length})</div>
+          <div class="session-logs" style="max-height:200px;overflow-y:auto;background:#faf9f5;border:1px solid #e8e6dc;border-radius:6px;padding:8px;">
+            ${logs.map(l => {
+              const cls = l.level === "error" ? "log-error" : l.level === "warning" ? "log-warn" : "";
+              return `<div class="log-line ${cls}"><span class="log-ts">${l.timestamp || ""}</span> ${l.stage ? `[S${l.stage}]` : ""} ${escapeHtml(l.message || "")}</div>`;
+            }).join("")}
+          </div>
+        </div>`;
+      }
+
+      // Actions
+      detailHtml += `<div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-sm" onclick="navigateToSession('${sid}')">Open in Pipeline View</button>
+      </div>`;
+
+      body.innerHTML = detailHtml;
+    } catch(e) {
+      body.innerHTML = `<div class="error-panel" style="margin:0;">Error loading session: ${e.message}</div>`;
+    }
+  }
+}
+
+async function deleteDemo(demoId) {
+  if (!confirm("Delete this demo? It will no longer appear in the library or be matched to future sessions.")) return;
+  try {
+    const res = await fetch(`/api/demos/${demoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: false }),
+    });
+    if (!res.ok) throw new Error("Failed to delete");
+    showToast("Demo deleted");
+    showDemosList();
+    loadDemos();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function redeployFromDetail(sid) {
+  sessionId = sid;
+  switchTab("create");
+  await restoreSession(sid);
+  await redeploySession();
+}
+
+function copySessionId(sid, el) {
+  navigator.clipboard.writeText(sid).then(() => {
+    const orig = el.textContent;
+    el.textContent = "copied!";
+    el.style.color = "#788c5d";
+    setTimeout(() => { el.textContent = orig; el.style.color = ""; }, 1500);
+  });
+}
+
+function navigateToSession(sid) {
+  switchTab("create");
+  history.replaceState(null, "", `?session=${sid}`);
+  restoreSession(sid);
+}
+
+// =========================================================================
+// SESSIONS
+// =========================================================================
+let _sessionsCache = [];
+let _sessionDetailCache = {};
+
+async function loadSessions() {
+  try {
+    const res = await fetch("/sessions");
+    _sessionsCache = await res.json();
+    renderSessionList();
+  } catch (e) { console.error("loadSessions", e); }
+}
+
+function getSessionStatusClass(status) {
+  if (!status) return "idle";
+  if (status.startsWith("waiting")) return "waiting";
+  if (["running","deploying","verifying","done","error","idle"].includes(status)) return status;
+  return "idle";
+}
+
+function getSessionLabel(s) {
+  if (s.company) return s.company;
+  if (s.demo_name) return s.demo_name;
+  return s.id;
+}
+
+function getFilteredSessions() {
+  const search = (document.getElementById("session-filter-search").value || "").toLowerCase();
+  const status = document.getElementById("session-filter-status").value;
+  return _sessionsCache.filter(s => {
+    if (status && !s.status?.startsWith(status)) return false;
+    if (search) {
+      const hay = `${s.id} ${s.company || ""} ${s.demo_name || ""}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function filterSessions() { renderSessionList(); }
+
+function renderSessionList() {
+  const wrap = document.getElementById("session-list-wrap");
+  const filtered = getFilteredSessions();
+  if (!filtered.length) {
+    wrap.innerHTML = `<p style="text-align:center;color:#aaa;margin-top:40px;">No sessions found.</p>`;
+    return;
+  }
+  let html = `<table class="session-table"><thead><tr>
+    <th>Status</th><th>Session</th><th>Stage</th><th>Mode</th><th>Links</th><th>Updated</th>
+  </tr></thead><tbody>`;
+  for (const s of filtered) {
+    const cls = getSessionStatusClass(s.status);
+    const label = escapeHtml(getSessionLabel(s));
+    const stageText = `${s.current_stage || 0}/4`;
+    const links = [];
+    if (s.deploy_url) links.push(`<a href="${s.deploy_url}" target="_blank" onclick="event.stopPropagation()" class="nav-chip">Open</a>`);
+    if (s.demo_id) links.push(`<span class="nav-chip" onclick="event.stopPropagation();switchTab('demos');showDemoDetail('${s.demo_id}')">Demo</span>`);
+    html += `<tr class="session-row" onclick="toggleSessionExpand('${s.id}')">
+      <td><span class="sess-badge ${cls}">${escapeHtml(s.status || "idle")}</span></td>
+      <td><strong>${label}</strong><br><span style="font-size:0.72rem;color:#999">${escapeHtml(s.id)}</span></td>
+      <td>Stage ${stageText}</td>
+      <td style="font-size:0.78rem">${s.mode || "-"}</td>
+      <td>${links.join(" ") || "-"}</td>
+      <td style="font-size:0.78rem;color:#888">${timeAgo(s.updated_at)}</td>
+    </tr>`;
+    html += `<tr class="session-expand" id="sess-expand-${s.id}"><td colspan="6"><div id="sess-detail-${s.id}"><em>Loading...</em></div></td></tr>`;
+  }
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+}
+
+async function toggleSessionExpand(sid) {
+  const row = document.getElementById(`sess-expand-${sid}`);
+  if (!row) return;
+  const isOpen = row.classList.contains("open");
+  // Close all others
+  document.querySelectorAll(".session-expand.open").forEach(r => r.classList.remove("open"));
+  if (isOpen) return;
+  row.classList.add("open");
+  // Lazy load
+  if (!_sessionDetailCache[sid]) {
+    try {
+      const res = await fetch(`/session/${sid}`);
+      _sessionDetailCache[sid] = await res.json();
+    } catch (e) {
+      document.getElementById(`sess-detail-${sid}`).innerHTML = `<span style="color:red">Failed to load</span>`;
+      return;
+    }
+  }
+  renderSessionDetail(sid);
+}
+
+function renderSessionDetail(sid) {
+  const s = _sessionDetailCache[sid];
+  if (!s) return;
+  const el = document.getElementById(`sess-detail-${sid}`);
+  let html = "";
+
+  // Error
+  if (s.error) {
+    html += `<div class="session-detail-section"><h4>Error</h4><pre style="color:#991b1b">${escapeHtml(s.error)}</pre></div>`;
+  }
+
+  // Stage 1 — Understand
+  const u = s.stage_1_understand;
+  if (u) {
+    const c = u.customer || {};
+    html += `<div class="session-detail-section"><h4>Stage 1 — Understand</h4>`;
+    html += `<div style="font-size:0.82rem;margin-bottom:6px">`;
+    if (c.name) html += `<strong>${escapeHtml(c.name)}</strong>`;
+    if (c.company) html += ` @ ${escapeHtml(c.company)}`;
+    if (c.industry) html += ` · ${escapeHtml(c.industry)}`;
+    html += `</div>`;
+    if (u.core_problem) html += `<p style="font-size:0.8rem;color:#555;margin:4px 0"><em>${escapeHtml(u.core_problem)}</em></p>`;
+    if (u.demo_type) html += `<span class="sess-badge done" style="font-size:0.65rem">${escapeHtml(u.demo_type)}</span> `;
+    if (u.demo_decision) html += `<span class="sess-badge ${u.demo_decision === 'YES' ? 'done' : 'error'}" style="font-size:0.65rem">${u.demo_decision}</span>`;
+    html += `</div>`;
+  }
+
+  // Stage 2 — Design
+  const d = s.stage_2_design;
+  if (d) {
+    const spec = d.demo_spec || {};
+    html += `<div class="session-detail-section"><h4>Stage 2 — Design</h4>`;
+    if (spec.project_name) html += `<div style="font-size:0.82rem"><strong>${escapeHtml(spec.project_name)}</strong></div>`;
+    if (spec.summary) html += `<p style="font-size:0.8rem;color:#555;margin:4px 0">${escapeHtml(spec.summary)}</p>`;
+    html += `</div>`;
+  }
+
+  // Stage 3 — Build
+  if (s.stage_3_demo) {
+    html += `<div class="session-detail-section"><h4>Stage 3 — Build</h4><div style="font-size:0.8rem;color:#555">${s.stage_3_demo.length.toLocaleString()} chars of code generated</div></div>`;
+  }
+
+  // Stage 4 — Deploy
+  if (s.stage_4_guide) {
+    html += `<div class="session-detail-section"><h4>Stage 4 — Deploy</h4><pre style="white-space:pre-wrap;font-size:0.78rem;max-height:200px;overflow-y:auto">${escapeHtml(s.stage_4_guide)}</pre></div>`;
+  }
+
+  // Logs
+  const logs = s.logs || [];
+  if (logs.length) {
+    html += `<div class="session-detail-section"><h4>Logs (${logs.length})</h4>`;
+    html += `<div style="max-height:150px;overflow-y:auto;font-size:0.75rem;font-family:monospace;background:#fff;border:1px solid #e8e4df;border-radius:6px;padding:8px">`;
+    for (const l of logs.slice(-20)) {
+      const color = l.level === "error" ? "#991b1b" : l.level === "warn" ? "#92400e" : "#555";
+      html += `<div style="color:${color}">${escapeHtml(l.message)}</div>`;
+    }
+    html += `</div></div>`;
+  }
+
+  // Actions
+  html += `<div class="session-detail-actions">`;
+  html += `<button class="btn btn-sm" onclick="navigateToSession('${sid}')">Open in Pipeline View</button>`;
+  // Find demo_id from cache
+  const sessionSummary = _sessionsCache.find(x => x.id === sid);
+  if (sessionSummary?.demo_id) {
+    html += `<button class="btn btn-sm" onclick="switchTab('demos');showDemoDetail('${sessionSummary.demo_id}')">View Demo</button>`;
+  }
+  if (s.stage_3_demo) {
+    html += `<button class="btn btn-sm" onclick="redeployFromDetail('${sid}')">Redeploy</button>`;
+  }
+  html += `</div>`;
+
+  el.innerHTML = html;
+}
+
+function showSessionDetail(sid) {
+  // Called from URL routing — just expand the session row
+  toggleSessionExpand(sid);
+  // Scroll to it after a tick
+  setTimeout(() => {
+    const row = document.getElementById(`sess-expand-${sid}`);
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 200);
+}
+
+// =========================================================================
+// TEAM
+// =========================================================================
 async function loadTeam() {
   const res = await fetch("/api/team");
   const data = await res.json();
@@ -970,62 +2005,6 @@ async function saveTeam() {
   showToast("Team saved");
 }
 
-// Solutions
-async function loadSolutions() {
-  const res = await fetch("/api/solutions");
-  const data = await res.json();
-  const solutions = data.solutions || [];
-  const wrap = document.getElementById("solutions-table-wrap");
-  if (!solutions.length) {
-    wrap.innerHTML = '<p style="color:#555;font-size:0.82rem;">No solutions yet. Add one below.</p>';
-    return;
-  }
-  wrap.innerHTML = `<table class="sol-table">
-    <thead><tr><th>Name</th><th>Type</th><th>Source</th><th>URL</th><th></th></tr></thead>
-    <tbody>${solutions.map(s => `<tr>
-      <td><span class="sol-name">${escapeHtml(s.name)}</span><br><span class="sol-id">${s.id}</span></td>
-      <td>${escapeHtml(s.demo_type || "-")}</td>
-      <td>${s.source || "-"}</td>
-      <td>${s.demo_url ? `<a href="${s.demo_url}" target="_blank" style="color:#5b6af0;font-size:0.78rem;">Open</a>` : "-"}</td>
-      <td><span class="sol-delete" onclick="deleteSolution('${s.id}','${escapeHtml(s.name)}')">Delete</span></td>
-    </tr>`).join("")}</tbody>
-  </table>`;
-}
-
-async function addSolution() {
-  const name = document.getElementById("sol-name").value.trim();
-  if (!name) { alert("Name is required"); return; }
-  const body = {
-    name,
-    description: document.getElementById("sol-description").value.trim() || undefined,
-    demo_type: document.getElementById("sol-demo-type").value.trim() || undefined,
-    stack: document.getElementById("sol-stack").value.trim() || undefined,
-    source: document.getElementById("sol-source").value,
-    demo_url: document.getElementById("sol-demo-url").value.trim() || undefined,
-    note: document.getElementById("sol-note").value.trim() || undefined,
-  };
-  const res = await fetch("/api/solutions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) { const e = await res.json(); alert(e.detail || "Error"); return; }
-  const data = await res.json();
-  showToast(`Added ${name} (${data.id})`);
-  // Clear form
-  ["sol-name","sol-description","sol-demo-type","sol-stack","sol-demo-url","sol-note"].forEach(id => document.getElementById(id).value = "");
-  document.getElementById("sol-source").value = "manual";
-  loadSolutions();
-}
-
-async function deleteSolution(id, name) {
-  if (!confirm(`Delete "${name}"?`)) return;
-  await fetch(`/api/solutions/${id}`, { method: "DELETE" });
-  showToast(`Deleted ${name}`);
-  loadSolutions();
-}
-
-// JSON file uploads
 function uploadTeamJson(input) {
   const file = input.files[0];
   if (!file) return;
@@ -1046,80 +2025,6 @@ function uploadTeamJson(input) {
     input.value = "";
   };
   reader.readAsText(file);
-}
-
-function uploadSolutionsJson(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    try {
-      const data = JSON.parse(reader.result);
-      const solutions = data.solutions || data;
-      if (!Array.isArray(solutions)) throw new Error("Expected a 'solutions' array");
-      if (!solutions.length) throw new Error("No solutions found in file");
-      if (!confirm(`Replace current solutions with ${solutions.length} entries from file?`)) return;
-      const res = await fetch("/api/solutions/bulk", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ solutions }),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Upload failed"); }
-      showToast(`Imported ${solutions.length} solutions`);
-      loadSolutions();
-    } catch(e) { alert("Invalid solutions JSON: " + e.message); }
-    input.value = "";
-  };
-  reader.readAsText(file);
-}
-
-// ---------------------------------------------------------------------------
-// Restore session (page reload)
-// ---------------------------------------------------------------------------
-async function restoreSession(sid) {
-  try {
-    const res = await fetch(`/session/${sid}`);
-    if (!res.ok) return;
-    const session = await res.json();
-    sessionId = sid;
-
-    initPipelineView();
-    showView("view-pipeline");
-    document.getElementById("pipeline-mode-tag").textContent =
-      session.mode === "verbose" ? "Verbose mode" : "Auto mode";
-
-    // Restore completed stages (unhide each before setting state)
-    const stageKeys = ["stage_1_understand","stage_2_design","stage_3_demo","stage_4_guide"];
-    stageKeys.forEach((key, i) => {
-      const id = i + 1;
-      const result = session[key];
-      if (result) {
-        const el = document.getElementById(`stage-${id}`);
-        if (el) el.style.display = "";
-        setStageState(id, "done");
-        setStageOutput(id, id === 3 ? "(demo code — see output file)" : result);
-      }
-    });
-
-    if (session.status === "done") {
-      showDonePanel({ deploy_url: session.deploy_url, guide: session.stage_4_guide });
-    } else if (session.status === "running" || session.status === "waiting_continue" || session.status === "waiting_input") {
-      connectSSE();
-      if (session.status === "waiting_input") {
-        const understand = session.stage_1_understand;
-        const askItems = understand && understand.dependencies && understand.dependencies.ask_customer;
-        if (askItems) showInputPanel(askItems);
-      }
-    }
-
-    if (session.stage_1_understand) {
-      const c = session.stage_1_understand.customer || {};
-      document.getElementById("pipeline-company").textContent =
-        `${c.name || ""} @ ${c.company || ""}`.trim();
-    }
-  } catch(e) {
-    console.warn("Could not restore session:", e);
-  }
 }
 </script>
 </body>

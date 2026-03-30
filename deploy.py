@@ -2,8 +2,11 @@ import os
 import re
 import json
 import time
-import requests
+import ast
+from dataclasses import dataclass, field
 from pathlib import Path
+
+import requests
 
 GITHUB_API = "https://api.github.com"
 RAILWAY_API = "https://backboard.railway.app/graphql/v2"
@@ -135,9 +138,23 @@ def validate_demo_files(files: dict) -> list:
     if "PORT" not in main_content:
         warnings.append("main.py does not reference $PORT — app may not bind correctly on Railway")
 
-    # 5. Python syntax check (in-memory, works anywhere)
+    # 5. Python syntax check and AST validation (in-memory, works anywhere)
     try:
-        compile(main_content, "main.py", "exec")
+        tree = ast.parse(main_content, filename="main.py")
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                is_template_call = False
+                if isinstance(node.func, ast.Attribute) and node.func.attr == "TemplateResponse":
+                    is_template_call = True
+                elif isinstance(node.func, ast.Name) and node.func.id == "TemplateResponse":
+                    is_template_call = True
+                
+                if is_template_call and node.args:
+                    first_arg = node.args[0]
+                    # If first arg is a string literal (e.g. "index.html"), it's using the old deprecated syntax
+                    is_str_literal = (isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str)) or type(first_arg).__name__ == "Str"
+                    if is_str_literal:
+                        raise ValidationError("TemplateResponse called with template name as first positional argument. Starlette 0.28+ requires `request` as the first argument. LLM must use `TemplateResponse(request=request, name='...', context={...})`")
     except SyntaxError as e:
         raise ValidationError(f"Syntax error in main.py: {e}")
 
@@ -157,6 +174,156 @@ def validate_demo_files(files: dict) -> list:
                     raise ValidationError(f"Malformed JSON in {fname}: {base_e} (auto-fix failed: {final_e})")
 
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# Enhanced validation (returns report instead of raising)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ValidationReport:
+    """Result of static analysis on demo files."""
+    files: dict = field(default_factory=dict)
+    errors: list = field(default_factory=list)
+    warnings: list = field(default_factory=list)
+    fixable: bool = False  # True if errors can be auto-fixed by verification agent
+
+
+def analyze_demo_files(files: dict) -> ValidationReport:
+    """
+    Static analysis on parsed demo files. Returns a structured report
+    instead of raising — lets the verification agent fix issues.
+    """
+    report = ValidationReport(files=files)
+
+    # 1. Required files (NOT fixable — can't invent missing files)
+    for required in ("main.py", "requirements.txt", "Procfile"):
+        if required not in files:
+            report.errors.append(f"Missing required file: {required}")
+    if report.errors:
+        return report  # Can't analyze further without required files
+
+    main_content = files["main.py"]
+    req_content = files["requirements.txt"]
+
+    # 2. Banned packages (NOT fixable)
+    for line in req_content.splitlines():
+        line_stripped = line.strip().lower()
+        if not line_stripped or line_stripped.startswith("#"):
+            continue
+        for banned in _BANNED_PACKAGES:
+            if banned in line_stripped:
+                report.errors.append(f"Banned package: {line.strip()}")
+        if _BANNED_PYDANTIC.search(line_stripped):
+            report.errors.append(f"Banned pydantic version: {line.strip()}")
+
+    # 3. python-multipart check (FIXABLE)
+    form_indicators = ("UploadFile", "Form(", "File(")
+    if any(ind in main_content for ind in form_indicators):
+        if "python-multipart" not in req_content.lower():
+            report.errors.append(
+                "main.py uses form data (UploadFile/Form/File) but requirements.txt "
+                "is missing python-multipart>=0.0.9"
+            )
+            report.fixable = True
+
+    # 4. $PORT binding (FIXABLE)
+    if "PORT" not in main_content:
+        report.errors.append(
+            "main.py does not reference $PORT — app will not bind correctly on Railway"
+        )
+        report.fixable = True
+
+    # 5. AST-based checks (FIXABLE)
+    try:
+        tree = ast.parse(main_content, filename="main.py")
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            # TemplateResponse deprecated syntax
+            is_template_call = (
+                (isinstance(node.func, ast.Attribute) and node.func.attr == "TemplateResponse")
+                or (isinstance(node.func, ast.Name) and node.func.id == "TemplateResponse")
+            )
+            if is_template_call and node.args:
+                first_arg = node.args[0]
+                is_str_literal = (
+                    isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str)
+                ) or type(first_arg).__name__ == "Str"
+                if is_str_literal:
+                    report.errors.append(
+                        f"Line {node.lineno}: TemplateResponse uses deprecated syntax. "
+                        "Must use TemplateResponse(request=request, name='...', context={{...}})"
+                    )
+                    report.fixable = True
+
+    except SyntaxError as e:
+        report.errors.append(f"Syntax error in main.py: {e}")
+        report.fixable = True
+
+    # 6. Hardcoded model names (FIXABLE)
+    hardcoded_models = ["claude-sonnet-4-20250514", "claude-3-5-sonnet", "claude-3-opus"]
+    for model in hardcoded_models:
+        if f'"{model}"' in main_content or f"'{model}'" in main_content:
+            report.errors.append(
+                f"Hardcoded model name '{model}' in main.py — "
+                "must use os.environ.get('ANTHROPIC_MODEL', 'claude-3-haiku-20240307')"
+            )
+            report.fixable = True
+
+    # 7. JSON file checks
+    for fname, fcontent in files.items():
+        if fname.endswith(".json") and fcontent.strip():
+            try:
+                json.loads(fcontent)
+            except json.JSONDecodeError:
+                try:
+                    fixed = _fix_truncated_json(fcontent)
+                    json.loads(fixed)
+                    files[fname] = fixed
+                    report.warnings.append(f"Auto-fixed truncated JSON in {fname}")
+                except Exception:
+                    report.errors.append(f"Malformed JSON in {fname}")
+                    report.fixable = True
+
+    return report
+
+
+# ---------------------------------------------------------------------------
+# Post-deploy health check
+# ---------------------------------------------------------------------------
+
+def health_check(url: str, retries: int = 3, delay: int = 5) -> bool:
+    """
+    GET the deploy URL and verify it returns a 2xx/3xx response.
+    Retries with linear backoff to handle slow startups.
+    """
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, timeout=15)
+            if 200 <= resp.status_code < 400:
+                return True
+        except requests.RequestException:
+            pass
+        if attempt < retries - 1:
+            time.sleep(delay * (attempt + 1))
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Deploy result
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DeployResult:
+    """Rich result from deploy_demo() with all deploy metadata."""
+    url: str
+    github_repo: str
+    project_id: str
+    service_id: str
+    environment_id: str
+    verified: bool = False
+    error: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -515,33 +682,36 @@ def wait_for_deploy(project_id: str, service_id: str, timeout: int = 300) -> Non
 # Orchestrator
 # ---------------------------------------------------------------------------
 
-def deploy_demo(demo_output: str, slug: str, classifier: dict = None, design_spec: dict = None) -> str:
+def deploy_demo(demo_output: str, slug: str, classifier: dict = None,
+                design_spec: dict = None, files: dict = None) -> DeployResult:
     """
     Full deploy pipeline:
-      1. Parse demo builder output → files
-      2. Create GitHub repo + push files
-      3. Create Railway project + service linked to repo
-      4. Trigger deploy + create domain
-      5. Wait for SUCCESS
-      6. Register deployment in solutions.json
-      7. Return live URL
+      1. Parse demo builder output → files (or use pre-parsed files)
+      2. Validate + inject skills
+      3. Create GitHub repo + push files
+      4. Create Railway project + service
+      5. Trigger deploy + create domain
+      6. Wait for SUCCESS
+      7. Health check
+      8. Return DeployResult
 
     Args:
-        demo_output: Raw string returned by run_demo_builder()
-        slug:        URL-safe customer slug, e.g. "renocomputerfix"
-        classifier:  Optional classifier output dict — used to enrich the registry entry
+        demo_output: Raw string returned by run_build()
+        slug:        URL-safe customer slug
+        classifier:  Optional understand output dict
+        design_spec: Optional design output dict (for skill injection)
+        files:       Optional pre-parsed files dict (skips parse_demo_files)
 
     Returns:
-        Live URL string, e.g. "https://demo-renocomputerfix.up.railway.app"
+        DeployResult with all deploy metadata
     """
-    
-    # Railway project names have a 32 character limit. "demo-" is 5 chars.
-    # We limit the slug to 25 chars and strip leading/trailing hyphens.
+    # Railway project names have a 32 character limit
     slug = re.sub(r"[^a-z0-9-]", "-", slug.lower())
     slug = re.sub(r"-+", "-", slug).strip("-")[:25].strip("-")
 
-    # Step 0 — parse files
-    files = parse_demo_files(demo_output)
+    # Step 0 — parse files (if not pre-parsed)
+    if files is None:
+        files = parse_demo_files(demo_output)
 
     # Step 0b — validate before pushing (raises ValidationError on hard failures)
     warnings = validate_demo_files(files)
@@ -553,19 +723,19 @@ def deploy_demo(demo_output: str, slug: str, classifier: dict = None, design_spe
     tokens_to_inject = set()
     if design_spec:
         required_skills = design_spec.get("demo_spec", {}).get("required_skills", [])
-    
+
     for skill in required_skills:
         skill_dir = Path(__file__).parent / "skills" / skill
         if not skill_dir.exists():
             continue
-            
+
         adapter_path = skill_dir / "adapter.py"
         manifest_path = skill_dir / "manifest.json"
-        
+
         if adapter_path.exists():
             files[f"skills/{skill}.py"] = adapter_path.read_text()
             files["skills/__init__.py"] = ""
-            
+
         if manifest_path.exists():
             try:
                 manifest = json.loads(manifest_path.read_text())
@@ -587,11 +757,22 @@ def deploy_demo(demo_output: str, slug: str, classifier: dict = None, design_spe
     # Step 3.5 — Inject environment variables (API Keys)
     inject_railway_variables(project_id, environment_id, service_id, extra_tokens=tokens_to_inject)
 
-    # Step 4 — trigger deploy + provision domain in parallel order
+    # Step 4 — trigger deploy + provision domain
     trigger_railway_deploy(service_id, environment_id)
     live_url = create_railway_domain(service_id, environment_id)
 
     # Step 5 — wait for live
     wait_for_deploy(project_id, service_id)
 
-    return live_url
+    # Step 6 — health check
+    verified = health_check(live_url)
+
+    return DeployResult(
+        url=live_url,
+        github_repo=full_name,
+        project_id=project_id,
+        service_id=service_id,
+        environment_id=environment_id,
+        verified=verified,
+        error=None if verified else f"Health check failed for {live_url}",
+    )
