@@ -20,6 +20,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 # Resolve project root (web/app.py → parent is project root)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -38,10 +40,64 @@ from pipeline import (
     read_transcript,
 )
 from storage import get_backend
+from web.auth import get_auth_provider
 
 app = FastAPI()
 
 _backend = get_backend()
+_auth = get_auth_provider()
+
+# ---------------------------------------------------------------------------
+# Auth middleware
+# ---------------------------------------------------------------------------
+
+# Paths that never require authentication
+_AUTH_EXEMPT = {"/", "/api/auth/config", "/favicon.ico"}
+_AUTH_EXEMPT_PREFIXES = ("/static/",)
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Auth disabled — pass through
+        if not _auth.is_enabled:
+            request.state.user = None
+            return await call_next(request)
+
+        path = request.url.path
+
+        # Exempt paths
+        if path in _AUTH_EXEMPT or any(path.startswith(p) for p in _AUTH_EXEMPT_PREFIXES):
+            request.state.user = None
+            return await call_next(request)
+
+        # Extract token: Authorization header first, then ?token= query param (for SSE)
+        token = ""
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.removeprefix("Bearer ").strip()
+        elif "/stream/" in path:
+            token = request.query_params.get("token", "")
+
+        if not token:
+            return Response(
+                content='{"detail":"Authentication required"}',
+                status_code=401,
+                media_type="application/json",
+            )
+
+        user = await _auth.verify_token(token)
+        if user is None:
+            return Response(
+                content='{"detail":"Invalid or expired token"}',
+                status_code=401,
+                media_type="application/json",
+            )
+
+        request.state.user = user
+        return await call_next(request)
+
+
+app.add_middleware(AuthMiddleware)
 
 HTML_FILE = Path(__file__).parent / "index.html"
 
@@ -412,6 +468,12 @@ def _send_email(email: str, understand: dict, deploy_url: str, guide: str) -> No
 async def _capture_loop():
     global _loop
     _loop = asyncio.get_event_loop()
+
+
+@app.get("/api/auth/config")
+async def auth_config():
+    """Always public — returns auth provider config for the frontend."""
+    return JSONResponse(_auth.get_frontend_config())
 
 
 @app.get("/", response_class=HTMLResponse)

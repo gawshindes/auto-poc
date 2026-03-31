@@ -594,7 +594,12 @@
 </style>
 </head>
 <body>
-<div class="app" id="app-container">
+<!-- Auth gate — shown when AUTH_PROVIDER is set and user is not signed in -->
+<div id="auth-container" style="display:none; min-height:100vh; display:none; align-items:center; justify-content:center; background:#faf9f5;">
+  <div id="clerk-signin"></div>
+</div>
+
+<div class="app" id="app-container" style="display:none">
   <!-- Tab Navigation -->
   <nav class="tab-nav">
     <a class="brand" href="/">Demo Pipeline</a>
@@ -812,11 +817,113 @@ let stageResults = {};
 let _teamList = [];
 let _demosCache = [];
 let _currentTab = "create";
+let _authToken = null;  // Bearer token when auth is enabled
+
+// =========================================================================
+// Auth helpers
+// =========================================================================
+async function authFetch(url, options = {}) {
+  if (_authToken) {
+    options.headers = Object.assign({}, options.headers || {}, {
+      "Authorization": `Bearer ${_authToken}`,
+    });
+  }
+  return fetch(url, options);
+}
+
+async function initAuth() {
+  let config;
+  try {
+    const res = await fetch("/api/auth/config");
+    config = await res.json();
+  } catch (e) {
+    // Can't reach server — show app anyway
+    showApp();
+    return;
+  }
+
+  if (!config.enabled) {
+    showApp();
+    return;
+  }
+
+  if (config.provider === "clerk") {
+    await loadClerkAuth(config.publishable_key);
+  } else {
+    showApp();
+  }
+}
+
+function showApp() {
+  document.getElementById("auth-container").style.display = "none";
+  document.getElementById("app-container").style.display = "";
+}
+
+async function loadClerkAuth(publishableKey) {
+  // Derive Clerk frontend API URL from publishable key
+  // Format: pk_test_<base64> or pk_live_<base64> — base64 decodes to frontend API host
+  let frontendApi;
+  try {
+    const encoded = publishableKey.split("_")[2];
+    frontendApi = atob(encoded).replace(/\$$/, "");
+  } catch (e) {
+    console.error("Invalid Clerk publishable key format", e);
+    showApp();
+    return;
+  }
+
+  // Load from Clerk's own CDN (script tag sets data-clerk-publishable-key
+  // so window.Clerk is pre-configured as an instance, not a constructor)
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.setAttribute("data-clerk-publishable-key", publishableKey);
+    s.src = `https://${frontendApi}/npm/@clerk/clerk-js@latest/dist/clerk.browser.js`;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
+  await window.Clerk.load();
+
+  if (window.Clerk.user) {
+    _authToken = await window.Clerk.session.getToken();
+    setupTokenRefresh();
+    showApp();
+  } else {
+    const authContainer = document.getElementById("auth-container");
+    authContainer.style.display = "flex";
+    window.Clerk.mountSignIn(document.getElementById("clerk-signin"));
+    window.Clerk.addListener(async ({ user, session }) => {
+      if (user && session) {
+        _authToken = await session.getToken();
+        setupTokenRefresh();
+        window.Clerk.unmountSignIn(document.getElementById("clerk-signin"));
+        showApp();
+      }
+    });
+  }
+}
+
+function setupTokenRefresh() {
+  // Refresh token every 50s (Clerk tokens expire at ~60s)
+  setInterval(async () => {
+    try {
+      if (window.Clerk?.session) {
+        _authToken = await window.Clerk.session.getToken();
+      }
+    } catch (e) { /* session expired */ }
+  }, 50_000);
+}
 
 // =========================================================================
 // Init
 // =========================================================================
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
+  await initAuth();
+  initApp();
+});
+
+function initApp() {
   const params = new URLSearchParams(window.location.search);
   const sid = params.get("session");
   const demoId = params.get("demo");
@@ -840,7 +947,7 @@ window.addEventListener("load", () => {
   } else {
     switchTab("create", true);
   }
-});
+}
 
 // =========================================================================
 // Tab Navigation
@@ -945,7 +1052,7 @@ async function handleFile(file) {
   const form = new FormData();
   form.append("file", file);
   try {
-    const res = await fetch("/upload", { method: "POST", body: form });
+    const res = await authFetch("/upload", { method: "POST", body: form });
     if (!res.ok) { const e = await res.json(); alert(e.detail || "Upload failed"); return; }
     const data = await res.json();
     sessionId = data.session_id;
@@ -961,7 +1068,7 @@ async function handleFile(file) {
 async function startPipeline() {
   const email = document.getElementById("email-input").value.trim();
   const additional_context = document.getElementById("context-input").value.trim();
-  const res = await fetch(`/run/${sessionId}`, {
+  const res = await authFetch(`/run/${sessionId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode, email, additional_context }),
@@ -1054,7 +1161,10 @@ function toggleLogs() {
 // =========================================================================
 function connectSSE() {
   if (eventSource) eventSource.close();
-  eventSource = new EventSource(`/stream/${sessionId}`);
+  const sseUrl = _authToken
+    ? `/stream/${sessionId}?token=${encodeURIComponent(_authToken)}`
+    : `/stream/${sessionId}`;
+  eventSource = new EventSource(sseUrl);
 
   eventSource.addEventListener("log", e => {
     const data = JSON.parse(e.data);
@@ -1153,7 +1263,7 @@ function showContinuePanel(label) {
 
 async function sendContinue() {
   document.getElementById("continue-panel")?.remove();
-  await fetch(`/continue/${sessionId}`, { method: "POST" });
+  await authFetch(`/continue/${sessionId}`, { method: "POST" });
 }
 
 function showInputPanel(items) {
@@ -1187,7 +1297,7 @@ async function submitInputs(count) {
     if (el.value.trim()) pairs.push(`${label}: ${el.value.trim()}`);
   }
   document.getElementById("action-area").innerHTML = "";
-  await fetch(`/input/${sessionId}`, {
+  await authFetch(`/input/${sessionId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ inputs: pairs.join("\n") }),
@@ -1251,7 +1361,7 @@ async function redeploySession() {
   btn.textContent = "Deploying...";
   status.textContent = "";
   try {
-    const res = await fetch(`/redeploy/${sessionId}`, { method: "POST" });
+    const res = await authFetch(`/redeploy/${sessionId}`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Deploy failed");
     btn.style.display = "none";
@@ -1281,7 +1391,7 @@ async function redeploySession() {
 // =========================================================================
 async function restoreSession(sid) {
   try {
-    const res = await fetch(`/session/${sid}`);
+    const res = await authFetch(`/session/${sid}`);
     if (!res.ok) return;
     const session = await res.json();
     sessionId = sid;
@@ -1344,7 +1454,7 @@ async function restoreSession(sid) {
 // =========================================================================
 async function loadDemos() {
   try {
-    const res = await fetch("/api/demos");
+    const res = await authFetch("/api/demos");
     const all = await res.json();
     // Only show demos that have a deploy URL or were manually added
     _demosCache = all.filter(d => d.deploy_url || d.source === "manual");
@@ -1435,7 +1545,7 @@ async function submitNewDemo() {
     demo_url: document.getElementById("new-demo-url").value.trim() || undefined,
   };
   try {
-    const res = await fetch("/api/solutions", {
+    const res = await authFetch("/api/solutions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -1470,7 +1580,7 @@ async function showDemoDetail(demoId) {
   content.innerHTML = `<div class="empty-state">Loading...</div>`;
 
   try {
-    const demoRes = await fetch(`/api/demos/${demoId}`);
+    const demoRes = await authFetch(`/api/demos/${demoId}`);
     if (!demoRes.ok) {
       content.innerHTML = `<div class="error-panel">Demo not found</div>`;
       return;
@@ -1647,7 +1757,7 @@ async function toggleSessionCard(sid) {
   if (!wasExpanded && body.dataset.loaded !== "1") {
     body.innerHTML = `<div class="empty-state" style="padding:12px;">Loading...</div>`;
     try {
-      const res = await fetch(`/session/${sid}`);
+      const res = await authFetch(`/session/${sid}`);
       if (!res.ok) throw new Error("Failed to load session");
       const session = await res.json();
       body.dataset.loaded = "1";
@@ -1747,7 +1857,7 @@ async function toggleSessionCard(sid) {
 async function deleteDemo(demoId) {
   if (!confirm("Delete this demo? It will no longer appear in the library or be matched to future sessions.")) return;
   try {
-    const res = await fetch(`/api/demos/${demoId}`, {
+    const res = await authFetch(`/api/demos/${demoId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ is_active: false }),
@@ -1789,7 +1899,7 @@ let _sessionDetailCache = {};
 
 async function loadSessions() {
   try {
-    const res = await fetch("/sessions");
+    const res = await authFetch("/sessions");
     _sessionsCache = await res.json();
     renderSessionList();
   } catch (e) { console.error("loadSessions", e); }
@@ -1865,7 +1975,7 @@ async function toggleSessionExpand(sid) {
   // Lazy load
   if (!_sessionDetailCache[sid]) {
     try {
-      const res = await fetch(`/session/${sid}`);
+      const res = await authFetch(`/session/${sid}`);
       _sessionDetailCache[sid] = await res.json();
     } catch (e) {
       document.getElementById(`sess-detail-${sid}`).innerHTML = `<span style="color:red">Failed to load</span>`;
@@ -1964,7 +2074,7 @@ function showSessionDetail(sid) {
 // TEAM
 // =========================================================================
 async function loadTeam() {
-  const res = await fetch("/api/team");
+  const res = await authFetch("/api/team");
   const data = await res.json();
   _teamList = data.team || [];
   renderTeam();
@@ -1997,7 +2107,7 @@ async function removeTeamMember(index) {
 }
 
 async function saveTeam() {
-  await fetch("/api/team", {
+  await authFetch("/api/team", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ team: _teamList }),
